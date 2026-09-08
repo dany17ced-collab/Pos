@@ -162,7 +162,7 @@ abstract class VentaDao {
 
     @Query(
         """
-        UPDATE ventas SET estado = 'ANULADA', notaAnulacion = :motivo, sincronizado = 0 
+        UPDATE ventas SET estado = 'ANULADA', notaAnulacion = :motivo, sincronizado = 0, fecha = :ahora
         WHERE id = :ventaId
         """
     )
