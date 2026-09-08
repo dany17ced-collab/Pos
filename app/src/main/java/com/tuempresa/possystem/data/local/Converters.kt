@@ -3,6 +3,7 @@ package com.tuempresa.possystem.data.local
 import androidx.room.TypeConverter
 import com.tuempresa.possystem.data.local.entity.EstadoVenta
 import com.tuempresa.possystem.data.local.entity.MetodoPago
+import com.tuempresa.possystem.data.local.entity.RolUsuario
 import com.tuempresa.possystem.data.local.entity.TipoCorte
 import com.tuempresa.possystem.data.local.entity.TipoMovimiento
 
@@ -36,4 +37,10 @@ class Converters {
 
     @TypeConverter
     fun toTipoCorte(valor: String): TipoCorte = TipoCorte.valueOf(valor)
+
+    @TypeConverter
+    fun fromRolUsuario(valor: RolUsuario): String = valor.name
+
+    @TypeConverter
+    fun toRolUsuario(valor: String): RolUsuario = RolUsuario.valueOf(valor)
 }
