@@ -98,7 +98,7 @@ dependencies {
     ksp("androidx.room:room-compiler:2.6.1")
 
     // ---------- Supabase (Postgrest, Realtime, Storage, Auth) ----------
-    implementation(platform("io.github.jan-tennert.supabase:bom:2.6.0"))
+    implementation(platform("io.github.jan-tennert.supabase:bom:3.2.5"))
     implementation("io.github.jan-tennert.supabase:postgrest-kt")
     implementation("io.github.jan-tennert.supabase:realtime-kt")
     implementation("io.github.jan-tennert.supabase:storage-kt")
