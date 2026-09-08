@@ -33,9 +33,32 @@ interface ProductoDao {
     @Query("SELECT * FROM productos WHERE id = :id LIMIT 1")
     suspend fun obtenerPorId(id: String): ProductoEntity?
 
-    /** Búsqueda exacta por código de barras — usada por el escáner en el checkout. */
-    @Query("SELECT * FROM productos WHERE codigoBarras = :codigoBarras AND eliminado = 0 LIMIT 1")
+    /**
+     * Busca el producto "padre" por código de barras — usada por el escáner en el
+     * checkout y en inventario. Como padre e hijas comparten código de barras,
+     * se prioriza el registro sin productoBaseId (el padre); si no existe un padre
+     * explícito (producto simple sin variantes), devuelve ese único registro.
+     */
+    @Query(
+        """
+        SELECT * FROM productos 
+        WHERE codigoBarras = :codigoBarras AND eliminado = 0 
+        ORDER BY (CASE WHEN productoBaseId IS NULL THEN 0 ELSE 1 END) ASC
+        LIMIT 1
+        """
+    )
     suspend fun buscarPorCodigoBarras(codigoBarras: String): ProductoEntity?
+
+    /** Todas las variantes (talla/color) de un producto, buscadas por su código de barras compartido. */
+    @Query(
+        """
+        SELECT v.* FROM productos v
+        INNER JOIN productos p ON p.id = v.productoBaseId
+        WHERE p.codigoBarras = :codigoBarras AND v.eliminado = 0
+        ORDER BY v.talla ASC, v.color ASC
+        """
+    )
+    fun observarVariantesPorCodigoBarras(codigoBarras: String): Flow<List<ProductoEntity>>
 
     @Query("SELECT * FROM productos WHERE sku = :sku AND eliminado = 0 LIMIT 1")
     suspend fun buscarPorSku(sku: String): ProductoEntity?
