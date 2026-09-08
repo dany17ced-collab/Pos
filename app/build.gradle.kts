@@ -7,12 +7,12 @@ plugins {
 
 android {
     namespace = "com.tuempresa.possystem"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.tuempresa.possystem"
         minSdk = 26 // Android 8.0 - necesario para Bluetooth SPP estable y CameraX
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
 
