@@ -10,6 +10,13 @@ import androidx.room.PrimaryKey
  * es en sí misma otro ProductoEntity con `productoBaseId` apuntando al "padre".
  * Esto permite que cada variante tenga su propio SKU, código de barras y stock,
  * que es como se maneja en la práctica (cada talla/color se vende y controla por separado).
+ *
+ * Para ropa: el producto "padre" (productoBaseId = null) representa la prenda en
+ * general (ej. "Blusa floral") y comparte el mismo código de barras para escanear.
+ * Cada variante hija tiene su propia `talla` y `color`, su propio stock, y sus propios
+ * escalones de precio por cantidad en PrecioEscalonEntity (unidad/cuarto/media/docena).
+ * `precioVenta` en la variante actúa como precio de referencia (equivalente al escalón
+ * "Unidad") y respaldo por si aún no se configuran escalones para esa variante.
  */
 @Entity(
     tableName = "productos",
@@ -30,7 +37,10 @@ import androidx.room.PrimaryKey
     indices = [
         Index("categoriaId"),
         Index("productoBaseId"),
-        Index(value = ["codigoBarras"], unique = true),
+        // codigoBarras YA NO es único: el producto padre y todas sus variantes
+        // (tallas/colores) comparten el mismo código de barras físico impreso
+        // en la prenda; se escanea el código y luego se elige talla/color en pantalla.
+        Index(value = ["codigoBarras"]),
         Index(value = ["sku"], unique = true)
     ]
 )
@@ -56,7 +66,9 @@ data class ProductoEntity(
 
     // ---- Variantes ----
     val productoBaseId: String? = null, // null = producto simple o producto "padre" de variantes
-    val nombreVariante: String? = null, // ej: "Talla M / Azul"
+    val nombreVariante: String? = null, // ej: "Talla M / Azul" (para mostrar en listas rápido)
+    val talla: String? = null,          // "2","4","6","8","10","12","14","16" — solo en variantes hijas
+    val color: String? = null,          // solo en variantes hijas
 
     val activo: Boolean = true,
 
