@@ -1,59 +1,21 @@
 package com.tuempresa.possystem
 
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import java.io.PrintWriter
 import java.io.StringWriter
 
 /**
- * Actividad de emergencia SOLO PARA DIAGNÓSTICO: muestra el stack trace completo
- * de un crash en pantalla en vez de que la app se cierre sin explicación.
- * Se activa desde CrashHandler (ver POSApplication). Quitar una vez resuelto
- * el problema de estabilidad — no es parte del producto final.
+ * Mecanismo de diagnóstico SOLO PARA DEPURACIÓN: en vez de intentar lanzar una
+ * Activity nueva desde el manejador de excepciones no controladas (frágil, puede
+ * no funcionar según el estado del proceso), el stack trace del último crash se
+ * guarda en SharedPreferences. La pantalla de Login lo lee al arrancar y lo
+ * muestra en texto si existe, para poder diagnosticarlo sin herramientas de PC.
  *
- * Hereda de ComponentActivity (no de Activity puro) porque setContent { }
- * de Compose requiere ComponentActivity para funcionar correctamente.
+ * Quitar este mecanismo una vez resuelto el problema de estabilidad actual.
  */
-class CrashActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        val mensajeError = intent.getStringExtra("mensaje_error") ?: "Error desconocido (sin mensaje)"
-
-        setContent {
-            MaterialTheme(colorScheme = darkColorScheme()) {
-                Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF1A0000)) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(16.dp)
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text("La app encontró un error:", color = Color.White, fontSize = 16.sp)
-                        Text(mensajeError, color = Color(0xFFFF8A80), fontSize = 12.sp)
-                    }
-                }
-            }
-        }
-    }
-}
-
 object CrashHandler {
+    private const val PREFS_NAME = "diagnostico_crash"
+    private const val CLAVE_ULTIMO_ERROR = "ultimo_error"
+
     fun instalar(app: POSApplication) {
         val manejadorPrevio = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
@@ -62,15 +24,24 @@ object CrashHandler {
                 throwable.printStackTrace(PrintWriter(sw))
                 val texto = sw.toString()
 
-                val intent = android.content.Intent(app, CrashActivity::class.java).apply {
-                    putExtra("mensaje_error", texto)
-                    addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                app.startActivity(intent)
+                val prefs = app.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+                prefs.edit().putString(CLAVE_ULTIMO_ERROR, texto).apply()
             } catch (e: Exception) {
-                // si ni esto funciona, seguimos con el comportamiento normal
+                // si ni esto funciona, seguimos con el comportamiento normal de todos modos
             }
             manejadorPrevio?.uncaughtException(thread, throwable)
         }
+    }
+
+    /** Lee el último error guardado, o null si no hay ninguno. */
+    fun leerUltimoError(app: POSApplication): String? {
+        val prefs = app.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+        return prefs.getString(CLAVE_ULTIMO_ERROR, null)
+    }
+
+    /** Borra el error guardado (se llama después de mostrarlo, para no repetirlo). */
+    fun limpiarUltimoError(app: POSApplication) {
+        val prefs = app.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
+        prefs.edit().remove(CLAVE_ULTIMO_ERROR).apply()
     }
 }
