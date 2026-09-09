@@ -4,7 +4,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -208,8 +207,6 @@ private fun TeclaNumerica(texto: String, habilitado: Boolean, onClick: () -> Uni
             .background(FondoCarbonSuave)
             .clickable(
                 enabled = habilitado,
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
                 onClick = onClick
             ),
         contentAlignment = Alignment.Center
@@ -231,8 +228,6 @@ private fun TeclaBorrar(habilitado: Boolean, onClick: () -> Unit) {
             .clip(CircleShape)
             .clickable(
                 enabled = habilitado,
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
                 onClick = onClick
             ),
         contentAlignment = Alignment.Center
