@@ -48,20 +48,27 @@ class LoginViewModel(private val app: POSApplication) : ViewModel() {
     private fun intentarLogin() {
         viewModelScope.launch {
             _estado.value = EstadoLogin.Verificando
-            when (val resultado = app.authRepository.iniciarSesion(_pin.value)) {
-                is ResultadoLogin.Exitoso -> {
-                    app.sessionManager.iniciarSesion(resultado.usuario)
-                    // La navegación reacciona a sessionManager.usuarioActual; no se
-                    // necesita estado adicional aquí.
+            try {
+                when (val resultado = app.authRepository.iniciarSesion(_pin.value)) {
+                    is ResultadoLogin.Exitoso -> {
+                        app.sessionManager.iniciarSesion(resultado.usuario)
+                        // La navegación reacciona a sessionManager.usuarioActual; no se
+                        // necesita estado adicional aquí.
+                    }
+                    is ResultadoLogin.PinIncorrecto -> {
+                        _estado.value = EstadoLogin.Error
+                        _pin.value = ""
+                    }
+                    is ResultadoLogin.SinUsuariosActivos -> {
+                        _estado.value = EstadoLogin.SinUsuarios
+                        _pin.value = ""
+                    }
                 }
-                is ResultadoLogin.PinIncorrecto -> {
-                    _estado.value = EstadoLogin.Error
-                    _pin.value = ""
-                }
-                is ResultadoLogin.SinUsuariosActivos -> {
-                    _estado.value = EstadoLogin.SinUsuarios
-                    _pin.value = ""
-                }
+            } catch (e: Exception) {
+                // Cualquier error inesperado (BD no lista, etc.) se trata como PIN
+                // incorrecto en vez de dejar que la excepción tumbe la app.
+                _estado.value = EstadoLogin.Error
+                _pin.value = ""
             }
         }
     }
