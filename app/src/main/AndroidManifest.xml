@@ -44,13 +44,6 @@
             </intent-filter>
         </activity>
 
-        <!-- SOLO PARA DIAGNÓSTICO: muestra el stack trace de un crash en pantalla.
-             Quitar una vez resuelto el problema de estabilidad actual. -->
-        <activity
-            android:name=".CrashActivity"
-            android:exported="false"
-            android:theme="@style/Theme.POSSystem" />
-
         <!-- Worker de sincronización en background -->
         <provider
             android:name="androidx.startup.InitializationProvider"
