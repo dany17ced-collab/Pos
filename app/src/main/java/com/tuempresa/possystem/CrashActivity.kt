@@ -1,7 +1,8 @@
 package com.tuempresa.possystem
 
-import android.app.Activity
 import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,10 +12,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import java.io.PrintWriter
 import java.io.StringWriter
 
@@ -23,14 +25,17 @@ import java.io.StringWriter
  * de un crash en pantalla en vez de que la app se cierre sin explicación.
  * Se activa desde CrashHandler (ver POSApplication). Quitar una vez resuelto
  * el problema de estabilidad — no es parte del producto final.
+ *
+ * Hereda de ComponentActivity (no de Activity puro) porque setContent { }
+ * de Compose requiere ComponentActivity para funcionar correctamente.
  */
-class CrashActivity : Activity() {
+class CrashActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val mensajeError = intent.getStringExtra("mensaje_error") ?: "Error desconocido"
+        val mensajeError = intent.getStringExtra("mensaje_error") ?: "Error desconocido (sin mensaje)"
 
         setContent {
-            MaterialTheme {
+            MaterialTheme(colorScheme = darkColorScheme()) {
                 Surface(modifier = Modifier.fillMaxSize(), color = Color(0xFF1A0000)) {
                     Column(
                         modifier = Modifier
@@ -39,18 +44,12 @@ class CrashActivity : Activity() {
                             .verticalScroll(rememberScrollState()),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text("La app encontró un error:", color = Color.White)
-                        Text(mensajeError, color = Color(0xFFFF8A80))
+                        Text("La app encontró un error:", color = Color.White, fontSize = 16.sp)
+                        Text(mensajeError, color = Color(0xFFFF8A80), fontSize = 12.sp)
                     }
                 }
             }
         }
-    }
-
-    private fun setContent(content: @Composable () -> Unit) {
-        val composeView = androidx.compose.ui.platform.ComposeView(this)
-        composeView.setContent(content)
-        setContentView(composeView)
     }
 }
 
