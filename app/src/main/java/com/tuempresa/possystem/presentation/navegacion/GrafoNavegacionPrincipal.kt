@@ -11,6 +11,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.tuempresa.possystem.CrashHandler
 import com.tuempresa.possystem.POSApplication
 import com.tuempresa.possystem.data.local.entity.RolUsuario
 import com.tuempresa.possystem.presentation.home.PantallaHomeAdmin
@@ -61,7 +62,8 @@ fun GrafoNavegacionPrincipal(app: POSApplication) {
             val loginViewModel: LoginViewModel = viewModel(factory = fabricaViewModel(app) {
                 LoginViewModel(app)
             })
-            PantallaLogin(viewModel = loginViewModel)
+            val ultimoError = remember { CrashHandler.leerUltimoError(app) }
+            PantallaLogin(viewModel = loginViewModel, ultimoError = ultimoError)
         }
 
         composable(Rutas.HOME_VENDEDOR) {
