@@ -46,7 +46,13 @@ fun GrafoNavegacionPrincipal(app: POSApplication) {
             null -> Rutas.LOGIN
         }
         navController.navigate(destino) {
-            popUpTo(0) // limpia todo el historial: no se puede "volver" a una sesión anterior
+            // popUpTo(0) causaba un crash porque 0 no es un id de destino válido
+            // en este grafo (las rutas son strings, no ids numéricos). Se usa el id
+            // raíz real del grafo de navegación para limpiar todo el historial.
+            popUpTo(navController.graph.id) {
+                inclusive = true
+            }
+            launchSingleTop = true
         }
     }
 
