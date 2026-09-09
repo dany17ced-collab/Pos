@@ -41,7 +41,7 @@ private val TextoCremaApagado = Color(0xFFB6A199)
 private val ColorError = Color(0xFFE08585)
 
 @Composable
-fun PantallaLogin(viewModel: LoginViewModel) {
+fun PantallaLogin(viewModel: LoginViewModel, ultimoError: String? = null) {
     val pin by viewModel.pin.collectAsState()
     val estado by viewModel.estado.collectAsState()
 
@@ -53,6 +53,18 @@ fun PantallaLogin(viewModel: LoginViewModel) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+            if (ultimoError != null) {
+                Text(
+                    text = "Último error (diagnóstico):\n$ultimoError",
+                    color = Color(0xFFFF8A80),
+                    fontSize = 10.sp,
+                    modifier = Modifier
+                        .padding(bottom = 24.dp)
+                        .background(Color(0xFF3A1414))
+                        .padding(12.dp)
+                )
+            }
+
             EncabezadoLogin(estado = estado)
 
             IndicadorPin(
