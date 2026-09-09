@@ -399,12 +399,12 @@ private fun LineaCarritoItem(linea: LineaCarrito, onQuitar: () -> Unit) {
             Text(linea.producto.nombre, color = TextoCrema, fontSize = 14.sp, fontWeight = FontWeight.Medium)
             val detalle = buildString {
                 if (etiquetaVariante.isNotBlank()) append("$etiquetaVariante · ")
-                append("${linea.cantidad} × $${"%.2f".format(linea.precioUnitario)} (${linea.etiquetaEscalon})")
+                append("${linea.cantidad} × s/${"%.2f".format(linea.precioUnitario)} (${linea.etiquetaEscalon})")
             }
             Text(detalle, color = TextoCremaApagado, fontSize = 12.sp)
         }
         Text(
-            text = "$${"%.2f".format(linea.subtotal)}",
+            text = "s/${"%.2f".format(linea.subtotal)}",
             color = AcentoTerracota,
             fontSize = 15.sp,
             fontWeight = FontWeight.SemiBold
@@ -432,7 +432,7 @@ private fun PieCarrito(total: Double, habilitado: Boolean, onCobrar: () -> Unit)
         Column(modifier = Modifier.weight(1f)) {
             Text("Total", color = TextoCremaApagado, fontSize = 12.sp)
             Text(
-                "$${"%.2f".format(total)}",
+                "s/${"%.2f".format(total)}",
                 color = TextoCrema,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold
@@ -487,7 +487,7 @@ private fun PantallaCheckout(
             modifier = Modifier.padding(top = 16.dp)
         )
         Text(
-            text = "$${"%.2f".format(total)}",
+            text = "s/${"%.2f".format(total)}",
             color = AcentoTerracota,
             fontSize = 34.sp,
             fontWeight = FontWeight.Bold,
@@ -566,7 +566,7 @@ private fun PantallaCheckout(
                     val recibido = montoTexto.toDoubleOrNull()
                     if (recibido != null && recibido >= total) {
                         Text(
-                            text = "Cambio: $${"%.2f".format(recibido - total)}",
+                            text = "Cambio: s/${"%.2f".format(recibido - total)}",
                             color = ColorExito,
                             fontSize = 14.sp,
                             modifier = Modifier.padding(top = 8.dp)
