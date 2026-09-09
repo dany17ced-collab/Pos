@@ -19,11 +19,13 @@ import com.tuempresa.possystem.presentation.home.PantallaHomeVendedor
 import com.tuempresa.possystem.presentation.home.PantallaProximamente
 import com.tuempresa.possystem.presentation.login.LoginViewModel
 import com.tuempresa.possystem.presentation.login.PantallaLogin
+import com.tuempresa.possystem.presentation.venta.PantallaVenta
 
 private object Rutas {
     const val LOGIN = "login"
     const val HOME_ADMIN = "home_admin"
     const val HOME_VENDEDOR = "home_vendedor"
+    const val VENTA = "venta"
 }
 
 @Composable
@@ -69,7 +71,10 @@ fun GrafoNavegacionPrincipal(app: POSApplication) {
         composable(Rutas.HOME_VENDEDOR) {
             PantallaHomeVendedor(
                 nombreUsuario = usuarioActual?.nombre ?: "",
-                onNavegar = { ruta -> navController.navigate("proximamente/$ruta") },
+                onNavegar = { ruta ->
+                    if (ruta == "venta") navController.navigate(Rutas.VENTA)
+                    else navController.navigate("proximamente/$ruta")
+                },
                 onCerrarSesion = { app.sessionManager.cerrarSesion() }
             )
         }
@@ -77,9 +82,16 @@ fun GrafoNavegacionPrincipal(app: POSApplication) {
         composable(Rutas.HOME_ADMIN) {
             PantallaHomeAdmin(
                 nombreUsuario = usuarioActual?.nombre ?: "",
-                onNavegar = { ruta -> navController.navigate("proximamente/$ruta") },
+                onNavegar = { ruta ->
+                    if (ruta == "venta") navController.navigate(Rutas.VENTA)
+                    else navController.navigate("proximamente/$ruta")
+                },
                 onCerrarSesion = { app.sessionManager.cerrarSesion() }
             )
+        }
+
+        composable(Rutas.VENTA) {
+            PantallaVenta(app = app, onVolver = { navController.popBackStack() })
         }
 
         composable("proximamente/{seccion}") { backStackEntry ->
