@@ -55,26 +55,16 @@ class NuevoProductoViewModel(private val app: POSApplication) : ViewModel() {
     val precioCompraTexto: StateFlow<String> = _precioCompraTexto.asStateFlow()
     fun actualizarPrecioCompra(valor: String) { _precioCompraTexto.value = valor }
 
-    // ---- Escalones de precio (aplican a todas las variantes) ----
-    private val _escalones = MutableStateFlow(escalonesPorDefecto())
-    val escalones: StateFlow<List<EscalonEnCaptura>> = _escalones.asStateFlow()
-
-    fun actualizarPrecioEscalon(etiqueta: String, precioTexto: String) {
-        _escalones.value = _escalones.value.map {
-            if (it.etiqueta == etiqueta) it.copy(precioTexto = precioTexto) else it
-        }
-    }
-
-    // ---- Colores capturados (cada uno con sus tallas y stock) ----
+    // ---- Colores capturados (cada uno con sus tallas, y cada talla con su propio stock y precios) ----
     private val _colores = MutableStateFlow<List<ColorEnCaptura>>(emptyList())
     val colores: StateFlow<List<ColorEnCaptura>> = _colores.asStateFlow()
 
-    fun agregarColor(color: String, stockPorTalla: Map<String, Int>) {
-        if (color.isBlank() || stockPorTalla.isEmpty()) return
+    fun agregarColor(color: String, tallas: List<TallaEnCaptura>) {
+        if (color.isBlank() || tallas.isEmpty()) return
         _colores.value = _colores.value + ColorEnCaptura(
             id = UUID.randomUUID().toString(),
             color = color.trim(),
-            stockPorTalla = stockPorTalla
+            tallas = tallas
         )
     }
 
@@ -90,9 +80,13 @@ class NuevoProductoViewModel(private val app: POSApplication) : ViewModel() {
         if (_nombre.value.isBlank()) return "El nombre es obligatorio"
         if (_precioCompraTexto.value.toDoubleOrNull() == null) return "El precio de compra no es válido"
         if (_colores.value.isEmpty()) return "Agrega al menos un color con tallas"
-        val escalonUnidad = _escalones.value.find { it.etiqueta == "Unidad" }
-        if (escalonUnidad?.precioTexto?.toDoubleOrNull() == null) {
-            return "El precio de \"Unidad\" es obligatorio"
+        for (colorCaptura in _colores.value) {
+            for (tallaCaptura in colorCaptura.tallas) {
+                val escalonUnidad = tallaCaptura.escalones.find { it.etiqueta == "Unidad" }
+                if (escalonUnidad?.precioTexto?.toDoubleOrNull() == null) {
+                    return "Falta el precio \"Unidad\" en talla ${tallaCaptura.talla} (${colorCaptura.color})"
+                }
+            }
         }
         return null
     }
@@ -108,13 +102,15 @@ class NuevoProductoViewModel(private val app: POSApplication) : ViewModel() {
             _estadoGuardado.value = EstadoGuardado.Guardando
             try {
                 val precioCompra = _precioCompraTexto.value.toDouble()
-                val precioUnidadReferencia = _escalones.value
-                    .find { it.etiqueta == "Unidad" }!!
-                    .precioTexto.toDouble()
-
-                val productoPadreId = UUID.randomUUID().toString()
                 val codigo = _codigoBarras.value.ifBlank { null }
 
+                // Precio de referencia del producto padre: el de "Unidad" de la
+                // primera talla capturada (solo informativo, no afecta la venta real).
+                val precioReferenciaPadre = _colores.value.firstOrNull()?.tallas?.firstOrNull()
+                    ?.escalones?.find { it.etiqueta == "Unidad" }
+                    ?.precioTexto?.toDoubleOrNull() ?: 0.0
+
+                val productoPadreId = UUID.randomUUID().toString()
                 val productoPadre = ProductoEntity(
                     id = productoPadreId,
                     sku = "SKU-${System.currentTimeMillis()}",
@@ -123,38 +119,39 @@ class NuevoProductoViewModel(private val app: POSApplication) : ViewModel() {
                     descripcion = _descripcion.value.ifBlank { null },
                     categoriaId = _categoriaId.value,
                     precioCompra = precioCompra,
-                    precioVenta = precioUnidadReferencia,
+                    precioVenta = precioReferenciaPadre,
                     stockActual = 0, // el padre no vende stock directo, es solo agrupador
                     productoBaseId = null
                 )
                 productoDao.insertar(productoPadre)
 
-                val escalonesValidos = _escalones.value.mapNotNull { escalon ->
-                    val precio = escalon.precioTexto.toDoubleOrNull() ?: return@mapNotNull null
-                    escalon to precio
-                }
-
                 for (colorCaptura in _colores.value) {
-                    for ((talla, stock) in colorCaptura.stockPorTalla) {
+                    for (tallaCaptura in colorCaptura.tallas) {
+                        val stock = tallaCaptura.stockTexto.toIntOrNull() ?: 0
+                        val precioUnidad = tallaCaptura.escalones
+                            .find { it.etiqueta == "Unidad" }!!
+                            .precioTexto.toDouble()
+
                         val varianteId = UUID.randomUUID().toString()
                         val variante = ProductoEntity(
                             id = varianteId,
-                            sku = "SKU-${System.currentTimeMillis()}-$talla-${colorCaptura.color.take(3)}",
+                            sku = "SKU-${System.currentTimeMillis()}-${tallaCaptura.talla}-${colorCaptura.color.take(3)}",
                             codigoBarras = codigo, // comparte el mismo código de barras que el padre
                             nombre = _nombre.value.trim(),
                             descripcion = _descripcion.value.ifBlank { null },
                             categoriaId = _categoriaId.value,
                             precioCompra = precioCompra,
-                            precioVenta = precioUnidadReferencia,
+                            precioVenta = precioUnidad,
                             stockActual = stock,
                             productoBaseId = productoPadreId,
-                            nombreVariante = "Talla $talla / ${colorCaptura.color}",
-                            talla = talla,
+                            nombreVariante = "Talla ${tallaCaptura.talla} / ${colorCaptura.color}",
+                            talla = tallaCaptura.talla,
                             color = colorCaptura.color
                         )
                         productoDao.insertar(variante)
 
-                        val escalonesDeVariante = escalonesValidos.map { (escalon, precio) ->
+                        val escalonesValidos = tallaCaptura.escalones.mapNotNull { escalon ->
+                            val precio = escalon.precioTexto.toDoubleOrNull() ?: return@mapNotNull null
                             PrecioEscalonEntity(
                                 id = UUID.randomUUID().toString(),
                                 productoId = varianteId,
@@ -163,7 +160,7 @@ class NuevoProductoViewModel(private val app: POSApplication) : ViewModel() {
                                 precioUnitario = precio
                             )
                         }
-                        precioEscalonDao.insertarTodos(escalonesDeVariante)
+                        precioEscalonDao.insertarTodos(escalonesValidos)
                     }
                 }
 
