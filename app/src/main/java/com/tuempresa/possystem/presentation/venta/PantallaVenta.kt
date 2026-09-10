@@ -283,7 +283,7 @@ private fun SelectorVariante(
             Text("Elige talla / color", color = TextoCrema, fontSize = 16.sp, fontWeight = FontWeight.Medium)
             FlowRow(
                 modifier = Modifier.padding(top = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 variantes.forEach { variante ->
