@@ -8,6 +8,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -254,7 +256,7 @@ private fun BarraBusqueda(
         }
     }
 }
-
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SelectorVariante(
     variantes: List<ProductoEntity>,
@@ -279,9 +281,10 @@ private fun SelectorVariante(
             varianteSeleccionada = unico
         } else {
             Text("Elige talla / color", color = TextoCrema, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-            Row(
+            FlowRow(
                 modifier = Modifier.padding(top = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 variantes.forEach { variante ->
                     val etiqueta = listOfNotNull(variante.talla, variante.color).joinToString(" / ")
