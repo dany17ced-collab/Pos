@@ -18,19 +18,30 @@ fun escalonesPorDefecto(): List<EscalonEnCaptura> = listOf(
 )
 
 /**
- * Captura de una talla específica dentro de un color: su stock y su propia
- * tabla de precios por cantidad (cada talla puede costar distinto y tener
- * distintos precios de mayoreo, ej. talla 2 y talla 16 no cuestan lo mismo).
+ * Plantilla de precios de una talla: se define UNA SOLA VEZ por producto y
+ * se aplica igual a todos los colores (mismo precio por talla sin importar
+ * el color, ej. talla 2 y talla 16 cuestan distinto entre sí, pero el mismo
+ * precio en cualquier color). El stock NO va aquí — el stock sí es distinto
+ * por color y se captura aparte en StockPorColor.
  */
 data class TallaEnCaptura(
     val talla: String,
-    val stockTexto: String = "",
     val escalones: List<EscalonEnCaptura> = escalonesPorDefecto()
 )
 
-/** Una combinación de color + tallas marcadas, cada una con su stock y precios propios. */
+/**
+ * Stock de una talla específica dentro de un color concreto. Cada color
+ * tiene su propio inventario por talla, aunque comparta los precios de la
+ * plantilla de tallas.
+ */
+data class StockTallaEnCaptura(
+    val talla: String,
+    val stockTexto: String = ""
+)
+
+/** Un color agregado, con el stock de cada talla marcada (precios vienen de la plantilla). */
 data class ColorEnCaptura(
     val id: String, // id local temporal, solo para poder editar/quitar en la UI
     val color: String,
-    val tallas: List<TallaEnCaptura> // solo las tallas marcadas para este color
+    val stockPorTalla: Map<String, StockTallaEnCaptura> // clave = talla
 )
