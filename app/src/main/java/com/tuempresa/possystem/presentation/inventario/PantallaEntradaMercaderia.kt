@@ -22,6 +22,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Surface
@@ -77,6 +79,8 @@ fun PantallaEntradaMercaderia(
     val estadoBusqueda by viewModel.estadoBusqueda.collectAsState()
     val cantidadesPorVariante by viewModel.cantidadesPorVariante.collectAsState()
     val estadoRegistro by viewModel.estadoRegistro.collectAsState()
+    val mostrandoAgregarColor by viewModel.mostrandoAgregarColor.collectAsState()
+    val estadoAgregarColor by viewModel.estadoAgregarColor.collectAsState()
 
     var textoBusqueda by remember { mutableStateOf("") }
     var mostrandoEscaner by remember { mutableStateOf(false) }
@@ -93,7 +97,16 @@ fun PantallaEntradaMercaderia(
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = FondoCarbon) {
-        if (mostrandoEscaner) {
+        val estadoActual = estadoBusqueda
+        if (mostrandoAgregarColor && estadoActual is EstadoBusquedaProducto.Encontrado) {
+            PantallaAgregarColorEnEntrada(
+                nombreProducto = estadoActual.padre.nombre,
+                tallasDisponibles = viewModel.tallasExistentesDelProducto(),
+                estadoGuardado = estadoAgregarColor,
+                onGuardar = { color, stockPorTalla -> viewModel.agregarColorNuevo(color, stockPorTalla) },
+                onCancelar = { viewModel.cerrarAgregarColor(); viewModel.reiniciarEstadoAgregarColor() }
+            )
+        } else if (mostrandoEscaner) {
             Box(modifier = Modifier.fillMaxSize()) {
                 EscanerCodigoBarras(
                     modifier = Modifier.fillMaxSize(),
@@ -149,6 +162,7 @@ fun PantallaEntradaMercaderia(
                             cantidades = cantidadesPorVariante,
                             onCantidadCambiada = viewModel::actualizarCantidad,
                             onCambiarProducto = { viewModel.limpiarBusqueda(); textoBusqueda = "" },
+                            onAgregarColorNuevo = { viewModel.abrirAgregarColor() },
                             onIrANuevoProducto = onIrANuevoProducto
                         )
 
@@ -318,6 +332,7 @@ private fun SeccionVariantesEncontradas(
     cantidades: Map<String, String>,
     onCantidadCambiada: (String, String) -> Unit,
     onCambiarProducto: () -> Unit,
+    onAgregarColorNuevo: () -> Unit,
     onIrANuevoProducto: () -> Unit
 ) {
     Column(modifier = Modifier.padding(horizontal = 20.dp)) {
@@ -387,17 +402,183 @@ private fun SeccionVariantesEncontradas(
 
         Box(
             modifier = Modifier
-                .padding(top = 12.dp)
+                .padding(top = 16.dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(10.dp))
+                .background(FondoTarjeta)
+                .clickable(onClick = onAgregarColorNuevo)
+                .padding(14.dp)
+        ) {
+            Text(
+                "+ Agregar color nuevo (mismo precio)",
+                color = AcentoTerracota,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+
+        Box(
+            modifier = Modifier
+                .padding(top = 8.dp)
                 .clip(RoundedCornerShape(10.dp))
                 .clickable(onClick = onIrANuevoProducto)
                 .padding(vertical = 8.dp)
         ) {
             Text(
-                "¿Llegó una talla o color nuevo? Créalo en Nuevo producto →",
-                color = AcentoTerracota,
+                "¿Llegó una talla totalmente nueva o precio distinto? Créalo en Nuevo producto →",
+                color = TextoCremaApagado,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold
             )
+        }
+    }
+}
+
+/**
+ * Agrega un color nuevo a un producto ya existente: solo pide el nombre del
+ * color y el stock de cada talla ya usada por ese producto. El precio de cada
+ * talla se copia automáticamente de una variante existente de esa misma talla
+ * — por eso aquí no se pide precio en ningún momento.
+ */
+@Composable
+private fun PantallaAgregarColorEnEntrada(
+    nombreProducto: String,
+    tallasDisponibles: List<String>,
+    estadoGuardado: EstadoRegistroEntrada,
+    onGuardar: (String, Map<String, StockTallaEnCaptura>) -> Unit,
+    onCancelar: () -> Unit
+) {
+    var color by remember { mutableStateOf("") }
+    var tallasMarcadas by remember { mutableStateOf(setOf<String>()) }
+    var stockPorTalla by remember { mutableStateOf(mapOf<String, String>()) }
+
+    Surface(modifier = Modifier.fillMaxSize(), color = FondoCarbon) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp)
+     ) {
+            Text(
+                text = "‹ Cancelar",
+                color = TextoCrema,
+                fontSize = 16.sp,
+                modifier = Modifier.clickable(onClick = onCancelar)
+            )
+            Text(
+                text = "Color nuevo · $nombreProducto",
+                color = TextoCrema,
+                fontSize = 19.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
+            )
+            Text(
+                "El precio de cada talla se copia del que ya tiene este producto",
+                color = TextoCremaApagado,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            CampoTextoEntrada(valor = color, onCambio = { color = it }, placeholder = "Nombre del color (ej. Verde)")
+
+            if (tallasDisponibles.isEmpty()) {
+                Text(
+                    "Este producto aún no tiene ninguna talla con precio definido. Créalo primero en \"Nuevo producto\".",
+                    color = ColorError,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(top = 16.dp)
+                )
+            } else {
+                Text(
+                    "Tallas — marca las que llegaron en este color",
+                    color = TextoCremaApagado,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(top = 20.dp, bottom = 8.dp)
+                )
+                tallasDisponibles.forEach { talla ->
+                    val marcada = talla in tallasMarcadas
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (marcada) FondoTarjeta else Color.Transparent)
+                            .padding(if (marcada) 12.dp else 0.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = marcada,
+                                onCheckedChange = { activo ->
+                                    tallasMarcadas = if (activo) tallasMarcadas + talla else tallasMarcadas - talla
+                                },
+                                colors = CheckboxDefaults.colors(checkedColor = AcentoTerracota, uncheckedColor = TextoCremaApagado)
+                            )
+                            Text("Talla $talla", color = TextoCrema, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        }
+                        if (marcada) {
+                            Row(
+                                modifier = Modifier.padding(top = 8.dp, start = 40.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("Stock:", color = TextoCremaApagado, fontSize = 13.sp)
+                                TextField(
+                                    value = stockPorTalla[talla] ?: "",
+                                    onValueChange = { nuevo ->
+                                        if (nuevo.all { it.isDigit() }) {
+                                            stockPorTalla = stockPorTalla + (talla to nuevo)
+                                        }
+                                    },
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    modifier = Modifier
+                                        .padding(start = 8.dp)
+                                        .width(90.dp)
+                                        .height(56.dp),
+                                    colors = camposTextoColores(),
+                                    shape = RoundedCornerShape(10.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (estadoGuardado is EstadoRegistroEntrada.Error) {
+                Text(
+                    text = estadoGuardado.mensaje,
+                    color = ColorError,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(top = 12.dp)
+                )
+            }
+
+            val puedeGuardar = color.isNotBlank() &&
+                tallasMarcadas.isNotEmpty() &&
+                estadoGuardado !is EstadoRegistroEntrada.Guardando
+
+            Button(
+                onClick = {
+                    val mapaFinal = tallasMarcadas.associateWith { talla ->
+                        StockTallaEnCaptura(talla = talla, stockTexto = stockPorTalla[talla] ?: "")
+                    }
+                    onGuardar(color, mapaFinal)
+                },
+                enabled = puedeGuardar,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AcentoTerracota,
+                    disabledContainerColor = FondoTarjeta
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 24.dp)
+            ) {
+                Text(
+                    if (estadoGuardado is EstadoRegistroEntrada.Guardando) "Guardando…" else "Agregar color",
+                    color = if (puedeGuardar) FondoCarbon else TextoCremaApagado,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(vertical = 6.dp)
+                )
+            }
         }
     }
 }
