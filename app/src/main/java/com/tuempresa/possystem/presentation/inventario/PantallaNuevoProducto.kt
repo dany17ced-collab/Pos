@@ -305,7 +305,7 @@ private fun SeccionTallasYPrecios(
             fontWeight = FontWeight.Medium
         )
         Text(
-            "Marca las tallas del producto y define su precio — es el mismo para todos los colores",
+            "Marca las tallas del producto y define su precio - es el mismo para todos los colores",
             color = TextoCremaApagado,
             fontSize = 12.sp,
             modifier = Modifier.padding(top = 4.dp, bottom = 8.dp)
@@ -381,10 +381,7 @@ private fun CampoPrecioEscalon(valor: String, onCambio: (String) -> Unit) {
             .fillMaxWidth()
             .height(56.dp),
         colors = camposTextoColores(),
-        shape = RoundedCornerShape(10.dp),
-        contentPadding = TextFieldDefaults.contentPaddingWithoutLabel(
-            start = 10.dp, end = 10.dp, top = 4.dp, bottom = 4.dp
-        )
+        shape = RoundedCornerShape(10.dp)
     )
 }
 
@@ -468,7 +465,7 @@ private fun SeccionColores(
 /**
  * Pantalla para agregar un color: solo pide el nombre y el stock de cada
  * talla ya marcada en la plantilla (los precios se muestran de referencia,
- * no se repiten ni se pueden editar aquí — vienen de la plantilla común).
+ * no se repiten ni se pueden editar aquí - vienen de la plantilla común).
  */
 @Composable
 private fun PantallaAgregarColor(
