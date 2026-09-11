@@ -19,6 +19,7 @@ import com.tuempresa.possystem.presentation.home.PantallaHomeVendedor
 import com.tuempresa.possystem.presentation.home.PantallaProximamente
 import com.tuempresa.possystem.presentation.login.LoginViewModel
 import com.tuempresa.possystem.presentation.login.PantallaLogin
+import com.tuempresa.possystem.presentation.inventario.PantallaEntradaMercaderia
 import com.tuempresa.possystem.presentation.inventario.PantallaInventario
 import com.tuempresa.possystem.presentation.inventario.PantallaNuevoProducto
 import com.tuempresa.possystem.presentation.venta.PantallaVenta
@@ -30,6 +31,7 @@ private object Rutas {
     const val VENTA = "venta"
     const val INVENTARIO = "inventario"
     const val NUEVO_PRODUCTO = "nuevo_producto"
+    const val ENTRADA_MERCADERIA = "entrada_mercaderia"
 }
 
 @Composable
@@ -107,7 +109,8 @@ fun GrafoNavegacionPrincipal(app: POSApplication) {
             PantallaInventario(
                 app = app,
                 onVolver = { navController.popBackStack() },
-                onNuevoProducto = { navController.navigate(Rutas.NUEVO_PRODUCTO) }
+                onNuevoProducto = { navController.navigate(Rutas.NUEVO_PRODUCTO) },
+                onEntradaMercaderia = { navController.navigate(Rutas.ENTRADA_MERCADERIA) }
             )
         }
 
@@ -116,6 +119,18 @@ fun GrafoNavegacionPrincipal(app: POSApplication) {
                 app = app,
                 onVolver = { navController.popBackStack() },
                 onGuardado = { navController.popBackStack() }
+            )
+        }
+
+        composable(Rutas.ENTRADA_MERCADERIA) {
+            PantallaEntradaMercaderia(
+                app = app,
+                onVolver = { navController.popBackStack() },
+                onIrANuevoProducto = {
+                    navController.navigate(Rutas.NUEVO_PRODUCTO) {
+                        popUpTo(Rutas.ENTRADA_MERCADERIA) { inclusive = true }
+                    }
+                }
             )
         }
 
