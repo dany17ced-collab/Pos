@@ -472,4 +472,133 @@ private fun SeccionColores(
  */
 @Composable
 private fun PantallaAgregarColor(
-    tallasMarcadas: Li
+    tallasMarcadas: List<TallaEnCaptura>,
+    onGuardar: (String, Map<String, StockTallaEnCaptura>) -> Unit,
+    onCancelar: () -> Unit
+) {
+    var color by remember { mutableStateOf("") }
+    var stockPorTalla by remember {
+        mutableStateOf(tallasMarcadas.associate { it.talla to StockTallaEnCaptura(talla = it.talla) })
+    }
+
+    Surface(modifier = Modifier.fillMaxSize(), color = FondoCarbon) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp)
+        ) {
+            Text(
+                text = "‹ Cancelar",
+                color = TextoCrema,
+                fontSize = 16.sp,
+                modifier = Modifier.clickable(onClick = onCancelar)
+            )
+            Text(
+                text = "Agregar color",
+                color = TextoCrema,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(top = 16.dp, bottom = 16.dp)
+            )
+
+            CampoTexto(valor = color, onCambio = { color = it }, placeholder = "Nombre del color (ej. Vino, Azul)")
+
+            Text(
+                "Stock por talla - el precio ya está definido en la plantilla",
+                color = TextoCremaApagado,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(top = 20.dp, bottom = 8.dp)
+            )
+
+            tallasMarcadas.forEach { talla ->
+                val precioUnidad = talla.escalones.find { it.etiqueta == "Unidad" }?.precioTexto ?: "?"
+                val stockActual = stockPorTalla[talla.talla]?.stockTexto ?: ""
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(FondoTarjeta)
+                        .padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Talla ${talla.talla}", color = TextoCrema, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                        Text("S/$precioUnidad c/u", color = TextoCremaApagado, fontSize = 12.sp)
+                    }
+                    Text("Stock:", color = TextoCremaApagado, fontSize = 13.sp)
+                    TextField(
+                        value = stockActual,
+                        onValueChange = { nuevo ->
+                            if (nuevo.all { it.isDigit() }) {
+                                stockPorTalla = stockPorTalla + (talla.talla to StockTallaEnCaptura(talla.talla, nuevo))
+                            }
+                        },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .width(90.dp)
+                            .height(56.dp),
+                        colors = camposTextoColores(),
+                        shape = RoundedCornerShape(10.dp)
+                    )
+                }
+            }
+
+            val puedeGuardar = color.isNotBlank() &&
+                stockPorTalla.isNotEmpty()
+
+            Button(
+                onClick = { onGuardar(color, stockPorTalla) },
+                enabled = puedeGuardar,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = AcentoTerracota,
+                    disabledContainerColor = FondoTarjeta
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 24.dp)
+            ) {
+                Text(
+                    "Agregar",
+                    color = if (puedeGuardar) FondoCarbon else TextoCremaApagado,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(vertical = 6.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CampoTexto(
+    valor: String,
+    onCambio: (String) -> Unit,
+    placeholder: String,
+    tipoTeclado: KeyboardType = KeyboardType.Text
+) {
+    TextField(
+        value = valor,
+        onValueChange = onCambio,
+        placeholder = { Text(placeholder, color = TextoCremaApagado) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = tipoTeclado),
+        modifier = Modifier.fillMaxWidth(),
+        colors = camposTextoColores(),
+        shape = RoundedCornerShape(12.dp)
+    )
+}
+
+@Composable
+private fun camposTextoColores() = TextFieldDefaults.colors(
+    focusedContainerColor = FondoTarjeta,
+    unfocusedContainerColor = FondoTarjeta,
+    focusedTextColor = TextoCrema,
+    unfocusedTextColor = TextoCrema,
+    focusedIndicatorColor = Color.Transparent,
+    unfocusedIndicatorColor = Color.Transparent,
+    cursorColor = AcentoTerracota
+)
