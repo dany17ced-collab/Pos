@@ -338,28 +338,65 @@ private fun SelectorVariante(
             Text(unico.nombre, color = TextoCrema, fontSize = 16.sp, fontWeight = FontWeight.Medium)
             if (varianteSeleccionada == null) varianteSeleccionada = unico
         } else {
-            Text("Elige talla / color", color = TextoCrema, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+            var colorSeleccionado by remember { mutableStateOf<String?>(null) }
+            val coloresDisponibles = variantes.mapNotNull { it.color }.distinct()
+
+            Text("Elige color", color = TextoCrema, fontSize = 16.sp, fontWeight = FontWeight.Medium)
             FlowRow(
                 modifier = Modifier.padding(top = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                variantes.forEach { variante ->
-                    val etiqueta = listOfNotNull(variante.talla, variante.color).joinToString(" / ")
-                    val seleccionada = varianteSeleccionada?.id == variante.id
-                    val sinStock = variante.stockActual <= 0
+                coloresDisponibles.forEach { color ->
+                    val seleccionado = colorSeleccionado == color
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(10.dp))
-                            .background(if (seleccionada) AcentoTerracota else FondoCarbon)
-                            .clickable(enabled = !sinStock) { varianteSeleccionada = variante }
+                            .background(if (seleccionado) AcentoTerracota else FondoCarbon)
+                            .clickable {
+                                colorSeleccionado = color
+                                varianteSeleccionada = null
+                            }
                             .padding(horizontal = 14.dp, vertical = 10.dp)
                     ) {
                         Text(
-                            text = if (sinStock) "$etiqueta (agotado)" else etiqueta,
-                            color = if (sinStock) TextoCremaApagado else TextoCrema,
+                            text = color,
+                            color = if (seleccionado) FondoCarbon else TextoCrema,
                             fontSize = 13.sp
                         )
+                    }
+                }
+            }
+
+            if (colorSeleccionado != null) {
+                Text(
+                    "Elige talla",
+                    color = TextoCrema,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(top = 16.dp)
+                )
+                FlowRow(
+                    modifier = Modifier.padding(top = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    variantes.filter { it.color == colorSeleccionado }.forEach { variante ->
+                        val seleccionada = varianteSeleccionada?.id == variante.id
+                        val sinStock = variante.stockActual <= 0
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (seleccionada) AcentoTerracota else FondoCarbon)
+                                .clickable(enabled = !sinStock) { varianteSeleccionada = variante }
+                                .padding(horizontal = 14.dp, vertical = 10.dp)
+                        ) {
+                            Text(
+                                text = if (sinStock) "Talla ${variante.talla} (agotado)" else "Talla ${variante.talla}",
+                                color = if (sinStock) TextoCremaApagado else TextoCrema,
+                                fontSize = 13.sp
+                            )
+                        }
                     }
                 }
             }
