@@ -3,12 +3,14 @@ package com.tuempresa.possystem.presentation.inventario
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tuempresa.possystem.POSApplication
+import com.tuempresa.possystem.data.local.entity.PrecioEscalonEntity
 import com.tuempresa.possystem.data.local.entity.ProductoEntity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 sealed class EstadoBusquedaProducto {
     object SinBuscar : EstadoBusquedaProducto()
@@ -28,6 +30,7 @@ class EntradaMercaderiaViewModel(private val app: POSApplication) : ViewModel() 
 
     private val productoDao = app.database.productoDao()
     private val movimientoInventarioDao = app.database.movimientoInventarioDao()
+    private val precioEscalonDao = app.database.precioEscalonDao()
 
     // ---- Búsqueda de resultados por texto libre (nombre/SKU/código) mientras se escribe ----
     private val _resultadosBusqueda = MutableStateFlow<List<ProductoEntity>>(emptyList())
@@ -90,6 +93,115 @@ class EntradaMercaderiaViewModel(private val app: POSApplication) : ViewModel() 
         _estadoBusqueda.value = EstadoBusquedaProducto.SinBuscar
         _cantidadesPorVariante.value = emptyMap()
         _resultadosBusqueda.value = emptyList()
+        _mostrandoAgregarColor.value = false
+    }
+
+    // ---- Agregar color nuevo al producto ya encontrado, heredando precios por talla ----
+    private val _mostrandoAgregarColor = MutableStateFlow(false)
+    val mostrandoAgregarColor: StateFlow<Boolean> = _mostrandoAgregarColor.asStateFlow()
+
+    fun abrirAgregarColor() { _mostrandoAgregarColor.value = true }
+    fun cerrarAgregarColor() { _mostrandoAgregarColor.value = false }
+
+    /**
+     * Tallas que YA existen en alguna variante de este producto (en cualquier
+     * color), en el orden estándar. Sirven de referencia: solo se puede agregar
+     * un color nuevo usando tallas que el producto ya maneja, porque el precio
+     * de cada talla nueva se copia de una variante existente de esa misma talla.
+     */
+    fun tallasExistentesDelProducto(): List<String> {
+        val estado = _estadoBusqueda.value
+        if (estado !is EstadoBusquedaProducto.Encontrado) return emptyList()
+        val tallasUnicas = estado.variantes.mapNotNull { it.talla }.distinct()
+        return TALLAS_DISPONIBLES.filter { it in tallasUnicas }
+    }
+
+    /** Estado del guardado de un color nuevo (independiente del registro de entrada normal). */
+    private val _estadoAgregarColor = MutableStateFlow<EstadoRegistroEntrada>(EstadoRegistroEntrada.Inactivo)
+    val estadoAgregarColor: StateFlow<EstadoRegistroEntrada> = _estadoAgregarColor.asStateFlow()
+
+    /**
+     * Crea un color nuevo con las tallas marcadas, copiando el precio (escalones)
+     * de una variante existente de cada talla, y registra la entrada inicial de
+     * stock con `MovimientoInventarioDao.registrarEntrada`.
+     */
+    fun agregarColorNuevo(colorNuevo: String, stockPorTalla: Map<String, StockTallaEnCaptura>) {
+        val estado = _estadoBusqueda.value
+        if (estado !is EstadoBusquedaProducto.Encontrado) return
+        if (colorNuevo.isBlank() || stockPorTalla.isEmpty()) {
+            _estadoAgregarColor.value = EstadoRegistroEntrada.Error("Escribe un color y marca al menos una talla")
+            return
+        }
+
+        viewModelScope.launch {
+            _estadoAgregarColor.value = EstadoRegistroEntrada.Guardando
+            try {
+                val usuarioId = app.sessionManager.usuarioActual.value?.id
+                val padre = estado.padre
+
+                for ((talla, stockCaptura) in stockPorTalla) {
+                    // Variante existente de la misma talla (cualquier color) para copiar su precio.
+                    val referencia = estado.variantes.firstOrNull { it.talla == talla }
+                        ?: continue // sin referencia de precio para esa talla, se omite
+
+                    val escalonesReferencia = precioEscalonDao.obtenerEscalonesDeProducto(referencia.id)
+                    val precioUnidad = escalonesReferencia.find { it.etiqueta == "Unidad" }?.precioUnitario
+                        ?: referencia.precioVenta
+
+                    val varianteId = UUID.randomUUID().toString()
+                    val nuevaVariante = ProductoEntity(
+                        id = varianteId,
+                        sku = "SKU-${System.currentTimeMillis()}-$talla-${colorNuevo.take(3)}",
+                        codigoBarras = padre.codigoBarras,
+                        nombre = padre.nombre,
+                        descripcion = padre.descripcion,
+                        categoriaId = padre.categoriaId,
+                        precioCompra = referencia.precioCompra,
+                        precioVenta = precioUnidad,
+                        stockActual = 0, // se incrementa abajo vía registrarEntrada, para dejar rastro en la bitácora
+                        productoBaseId = padre.id,
+                        nombreVariante = "Talla $talla / $colorNuevo",
+                        talla = talla,
+                        color = colorNuevo.trim()
+                    )
+                    productoDao.insertar(nuevaVariante)
+
+                    val escalonesNuevos = escalonesReferencia.map { escalon ->
+                        PrecioEscalonEntity(
+                            id = UUID.randomUUID().toString(),
+                            productoId = varianteId,
+                            cantidadMinima = escalon.cantidadMinima,
+                            etiqueta = escalon.etiqueta,
+                            precioUnitario = escalon.precioUnitario
+                        )
+                    }
+                    precioEscalonDao.insertarTodos(escalonesNuevos)
+
+                    val stock = stockCaptura.stockTexto.toIntOrNull() ?: 0
+                    if (stock > 0) {
+                        movimientoInventarioDao.registrarEntrada(
+                            productoId = varianteId,
+                            cantidad = stock,
+                            costoUnitario = referencia.precioCompra,
+                            referenciaId = null,
+                            motivo = "Color nuevo: $colorNuevo",
+                            usuarioId = usuarioId
+                        )
+                    }
+                }
+
+                // Refresca la lista de variantes del producto para reflejar el color recién creado.
+                seleccionarProducto(padre)
+                _mostrandoAgregarColor.value = false
+                _estadoAgregarColor.value = EstadoRegistroEntrada.Exitoso
+            } catch (e: Exception) {
+                _estadoAgregarColor.value = EstadoRegistroEntrada.Error("No se pudo agregar el color. Intenta de nuevo.")
+            }
+        }
+    }
+
+    fun reiniciarEstadoAgregarColor() {
+        _estadoAgregarColor.value = EstadoRegistroEntrada.Inactivo
     }
 
     // ---- Registro de la entrada ----
