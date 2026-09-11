@@ -55,16 +55,42 @@ class NuevoProductoViewModel(private val app: POSApplication) : ViewModel() {
     val precioCompraTexto: StateFlow<String> = _precioCompraTexto.asStateFlow()
     fun actualizarPrecioCompra(valor: String) { _precioCompraTexto.value = valor }
 
-    // ---- Colores capturados (cada uno con sus tallas, y cada talla con su propio stock y precios) ----
+    // ---- Plantilla de tallas y PRECIOS: se define UNA VEZ y se comparte entre colores ----
+    private val _tallas = MutableStateFlow<Map<String, TallaEnCaptura>>(emptyMap())
+    val tallas: StateFlow<Map<String, TallaEnCaptura>> = _tallas.asStateFlow()
+
+    fun alternarTalla(talla: String, activa: Boolean) {
+        _tallas.value = if (activa) {
+            _tallas.value + (talla to (_tallas.value[talla] ?: TallaEnCaptura(talla = talla)))
+        } else {
+            _tallas.value - talla
+            // Nota: no se limpia el stock ya capturado por color para esa talla;
+            // si se vuelve a marcar, el stock previamente ingresado reaparece.
+        }
+    }
+
+    fun actualizarPrecioEscalon(talla: String, etiqueta: String, precioTexto: String) {
+        val actual = _tallas.value[talla] ?: return
+        val nuevosEscalones = actual.escalones.map {
+            if (it.etiqueta == etiqueta) it.copy(precioTexto = precioTexto) else it
+        }
+        _tallas.value = _tallas.value + (talla to actual.copy(escalones = nuevosEscalones))
+    }
+
+    /** Tallas marcadas, en el orden estándar de TALLAS_DISPONIBLES. */
+    fun tallasMarcadasOrdenadas(): List<TallaEnCaptura> =
+        TALLAS_DISPONIBLES.mapNotNull { _tallas.value[it] }
+
+    // ---- Colores: cada uno con su propio stock por talla (precios vienen de la plantilla) ----
     private val _colores = MutableStateFlow<List<ColorEnCaptura>>(emptyList())
     val colores: StateFlow<List<ColorEnCaptura>> = _colores.asStateFlow()
 
-    fun agregarColor(color: String, tallas: List<TallaEnCaptura>) {
-        if (color.isBlank() || tallas.isEmpty()) return
+    fun agregarColor(color: String, stockPorTalla: Map<String, StockTallaEnCaptura>) {
+        if (color.isBlank() || stockPorTalla.isEmpty()) return
         _colores.value = _colores.value + ColorEnCaptura(
             id = UUID.randomUUID().toString(),
             color = color.trim(),
-            tallas = tallas
+            stockPorTalla = stockPorTalla
         )
     }
 
@@ -79,15 +105,14 @@ class NuevoProductoViewModel(private val app: POSApplication) : ViewModel() {
     fun validar(): String? {
         if (_nombre.value.isBlank()) return "El nombre es obligatorio"
         if (_precioCompraTexto.value.toDoubleOrNull() == null) return "El precio de compra no es válido"
-        if (_colores.value.isEmpty()) return "Agrega al menos un color con tallas"
-        for (colorCaptura in _colores.value) {
-            for (tallaCaptura in colorCaptura.tallas) {
-                val escalonUnidad = tallaCaptura.escalones.find { it.etiqueta == "Unidad" }
-                if (escalonUnidad?.precioTexto?.toDoubleOrNull() == null) {
-                    return "Falta el precio \"Unidad\" en talla ${tallaCaptura.talla} (${colorCaptura.color})"
-                }
+        if (_tallas.value.isEmpty()) return "Marca al menos una talla y define su precio"
+        for (tallaCaptura in _tallas.value.values) {
+            val escalonUnidad = tallaCaptura.escalones.find { it.etiqueta == "Unidad" }
+            if (escalonUnidad?.precioTexto?.toDoubleOrNull() == null) {
+                return "Falta el precio \"Unidad\" en talla ${tallaCaptura.talla}"
             }
         }
+        if (_colores.value.isEmpty()) return "Agrega al menos un color con su stock"
         return null
     }
 
@@ -103,10 +128,11 @@ class NuevoProductoViewModel(private val app: POSApplication) : ViewModel() {
             try {
                 val precioCompra = _precioCompraTexto.value.toDouble()
                 val codigo = _codigoBarras.value.ifBlank { null }
+                val tallasOrdenadas = tallasMarcadasOrdenadas()
 
-                // Precio de referencia del producto padre: el de "Unidad" de la
-                // primera talla capturada (solo informativo, no afecta la venta real).
-                val precioReferenciaPadre = _colores.value.firstOrNull()?.tallas?.firstOrNull()
+                // Precio de referencia del producto padre: el de "Unidad" de la primera
+                // talla marcada (solo informativo, no afecta la venta real).
+                val precioReferenciaPadre = tallasOrdenadas.firstOrNull()
                     ?.escalones?.find { it.etiqueta == "Unidad" }
                     ?.precioTexto?.toDoubleOrNull() ?: 0.0
 
@@ -126,8 +152,9 @@ class NuevoProductoViewModel(private val app: POSApplication) : ViewModel() {
                 productoDao.insertar(productoPadre)
 
                 for (colorCaptura in _colores.value) {
-                    for (tallaCaptura in colorCaptura.tallas) {
-                        val stock = tallaCaptura.stockTexto.toIntOrNull() ?: 0
+                    for (tallaCaptura in tallasOrdenadas) {
+                        val stock = colorCaptura.stockPorTalla[tallaCaptura.talla]
+                            ?.stockTexto?.toIntOrNull() ?: 0
                         val precioUnidad = tallaCaptura.escalones
                             .find { it.etiqueta == "Unidad" }!!
                             .precioTexto.toDouble()
