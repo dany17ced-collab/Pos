@@ -10,15 +10,23 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,6 +43,7 @@ private val FondoTarjeta = Color(0xFF2E2427)
 private val AcentoTerracota = Color(0xFFD98E73)
 private val TextoCrema = Color(0xFFF3E9E1)
 private val TextoCremaApagado = Color(0xFFB6A199)
+private val ColorError = Color(0xFFE08585)
 
 @Composable
 fun PantallaInventario(
@@ -44,6 +53,8 @@ fun PantallaInventario(
 ) {
     val viewModel: InventarioViewModel = viewModel(factory = fabricaSimple { InventarioViewModel(app) })
     val productos by viewModel.productos.collectAsState()
+
+    var productoAEliminar by remember { mutableStateOf<ProductoEntity?>(null) }
 
     Surface(modifier = Modifier.fillMaxSize(), color = FondoCarbon) {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -93,22 +104,50 @@ fun PantallaInventario(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(productos, key = { it.id }) { producto ->
-                        TarjetaProducto(producto = producto)
+                        TarjetaProducto(
+                            producto = producto,
+                            onEliminar = { productoAEliminar = producto }
+                        )
                     }
                 }
             }
         }
     }
+
+    val productoObjetivo = productoAEliminar
+    if (productoObjetivo != null) {
+        AlertDialog(
+            onDismissRequest = { productoAEliminar = null },
+            title = { Text("¿Eliminar producto?") },
+            text = {
+                Text("Se eliminará \"${productoObjetivo.nombre}\" y todas sus tallas y colores. Esta acción no se puede deshacer.")
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.eliminarProductoConVariantes(productoObjetivo.id)
+                    productoAEliminar = null
+                }) {
+                    Text("Eliminar", color = ColorError)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { productoAEliminar = null }) {
+                    Text("Cancelar")
+                }
+            }
+        )
+    }
 }
 
 @Composable
-private fun TarjetaProducto(producto: ProductoEntity) {
+private fun TarjetaProducto(producto: ProductoEntity, onEliminar: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .background(FondoTarjeta)
-            .padding(16.dp)
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(producto.nombre, color = TextoCrema, fontSize = 16.sp, fontWeight = FontWeight.Medium)
@@ -127,6 +166,13 @@ private fun TarjetaProducto(producto: ProductoEntity) {
                 modifier = Modifier.padding(top = 6.dp)
             )
         }
+        Text(
+            text = "🗑",
+            fontSize = 18.sp,
+            modifier = Modifier
+                .padding(start = 12.dp)
+                .clickable(onClick = onEliminar)
+        )
     }
 }
 
