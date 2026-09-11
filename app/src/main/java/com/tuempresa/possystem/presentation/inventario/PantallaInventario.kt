@@ -49,7 +49,8 @@ private val ColorError = Color(0xFFE08585)
 fun PantallaInventario(
     app: POSApplication,
     onVolver: () -> Unit,
-    onNuevoProducto: () -> Unit
+    onNuevoProducto: () -> Unit,
+    onEntradaMercaderia: () -> Unit
 ) {
     val viewModel: InventarioViewModel = viewModel(factory = fabricaSimple { InventarioViewModel(app) })
     val productos by viewModel.productos.collectAsState()
@@ -81,6 +82,16 @@ fun PantallaInventario(
                 )
                 Box(
                     modifier = Modifier
+                        .clip(CircleShape)
+                        .background(FondoTarjeta)
+                        .clickable(onClick = onEntradaMercaderia)
+                        .padding(horizontal = 16.dp, vertical = 10.dp)
+                ) {
+                    Text("+ Entrada", color = TextoCrema, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                }
+                Box(
+                    modifier = Modifier
+                        .padding(start = 8.dp)
                         .clip(CircleShape)
                         .background(AcentoTerracota)
                         .clickable(onClick = onNuevoProducto)
