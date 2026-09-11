@@ -15,11 +15,14 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.UUID
 
-/** Resultado de buscar un producto por código de barras o texto. */
+/** Resultado de buscar productos por código de barras o texto. */
 sealed class ResultadoBusqueda {
     object SinBuscar : ResultadoBusqueda()
     object Buscando : ResultadoBusqueda()
     object NoEncontrado : ResultadoBusqueda()
+    /** Varios productos coinciden con el texto (ej. "buso" -> franela, algodón, french terry). */
+    data class VariosResultados(val productos: List<ProductoEntity>) : ResultadoBusqueda()
+    /** Un producto específico ya elegido: se muestran sus variantes (talla/color). */
     data class Encontrado(val padre: ProductoEntity?, val variantes: List<ProductoEntity>) : ResultadoBusqueda()
 }
 
@@ -45,19 +48,26 @@ class VentaViewModel(private val app: POSApplication) : ViewModel() {
     private val _estadoCobro = MutableStateFlow<EstadoCobro>(EstadoCobro.Inactivo)
     val estadoCobro: StateFlow<EstadoCobro> = _estadoCobro.asStateFlow()
 
-    /** El total se calcula directamente en la UI con derivedStateOf sobre carrito.value */
     fun calcularTotal(lineas: List<LineaCarrito>): Double = lineas.sumOf { it.subtotal }
 
-    /** Búsqueda por código de barras exacto (viene del escáner). */
+    /** Búsqueda por código de barras exacto (viene del escáner): va directo a variantes. */
     fun buscarPorCodigoBarras(codigo: String) {
         viewModelScope.launch {
             _resultadoBusqueda.value = ResultadoBusqueda.Buscando
             val producto = productoDao.buscarPorCodigoBarras(codigo)
-            resolverResultado(producto)
+            if (producto == null) {
+                _resultadoBusqueda.value = ResultadoBusqueda.NoEncontrado
+            } else {
+                mostrarVariantesDe(producto)
+            }
         }
     }
 
-    /** Búsqueda manual por nombre o SKU — toma el primer resultado que haga match exacto de SKU o similar por nombre. */
+    /**
+     * Búsqueda manual por nombre o SKU. Si hay varios productos padre que coinciden
+     * (ej. "buso" -> franela, algodón, french terry), se muestran todos para elegir.
+     * Si solo hay uno, se pasa directo a mostrar sus variantes.
+     */
     fun buscarPorTexto(texto: String) {
         if (texto.isBlank()) {
             _resultadoBusqueda.value = ResultadoBusqueda.SinBuscar
@@ -65,19 +75,33 @@ class VentaViewModel(private val app: POSApplication) : ViewModel() {
         }
         viewModelScope.launch {
             _resultadoBusqueda.value = ResultadoBusqueda.Buscando
-            val producto = productoDao.buscarPorSku(texto)
-                ?: productoDao.buscar(texto).first().firstOrNull { it.productoBaseId == null }
-            resolverResultado(producto)
+
+            val porSku = productoDao.buscarPorSku(texto)
+            if (porSku != null) {
+                mostrarVariantesDe(porSku)
+                return@launch
+            }
+
+            val coincidencias = productoDao.buscar(texto).first()
+                .filter { it.productoBaseId == null }
+
+            when {
+                coincidencias.isEmpty() -> _resultadoBusqueda.value = ResultadoBusqueda.NoEncontrado
+                coincidencias.size == 1 -> mostrarVariantesDe(coincidencias.first())
+                else -> _resultadoBusqueda.value = ResultadoBusqueda.VariosResultados(coincidencias)
+            }
         }
     }
 
-    private suspend fun resolverResultado(producto: ProductoEntity?) {
-        if (producto == null) {
-            _resultadoBusqueda.value = ResultadoBusqueda.NoEncontrado
-            return
+    /** Se llama cuando el usuario elige un producto específico de la lista de VariosResultados. */
+    fun elegirProducto(producto: ProductoEntity) {
+        viewModelScope.launch {
+            _resultadoBusqueda.value = ResultadoBusqueda.Buscando
+            mostrarVariantesDe(producto)
         }
-        // Si el producto encontrado ya es una variante (tiene padre), lo tratamos
-        // como si hubiéramos encontrado a su padre para mostrar todas las variantes hermanas.
+    }
+
+    private suspend fun mostrarVariantesDe(producto: ProductoEntity) {
         val esVariante = producto.productoBaseId != null
         val idPadre = if (esVariante) producto.productoBaseId!! else producto.id
         val padre = if (esVariante) productoDao.obtenerPorId(idPadre) else producto
@@ -96,36 +120,41 @@ class VentaViewModel(private val app: POSApplication) : ViewModel() {
         _resultadoBusqueda.value = ResultadoBusqueda.SinBuscar
     }
 
-    /** Agrega una variante al carrito con la cantidad indicada, calculando el precio por escalón. */
-    fun agregarAlCarrito(variante: ProductoEntity, cantidad: Int) {
-        if (cantidad <= 0) return
-        viewModelScope.launch {
-            val precio = precioCalculator.calcularPrecioUnitario(variante, cantidad)
-            val etiqueta = precioCalculator.obtenerEtiquetaEscalon(variante, cantidad)
+    /** Calcula el precio sugerido por escalón para mostrarlo editable en la UI antes de agregar. */
+    suspend fun calcularPrecioSugerido(variante: ProductoEntity, cantidad: Int): Double {
+        return precioCalculator.calcularPrecioUnitario(variante, cantidad)
+    }
 
-            val lineaExistente = _carrito.value.find { it.producto.id == variante.id }
-            if (lineaExistente != null) {
-                // Ya estaba en el carrito: se suma la cantidad y se recalcula el precio
-                // por si el nuevo total cambia de escalón (ej. pasa de "Unidad" a "Docena").
-                val nuevaCantidad = lineaExistente.cantidad + cantidad
-                val nuevoPrecio = precioCalculator.calcularPrecioUnitario(variante, nuevaCantidad)
-                val nuevaEtiqueta = precioCalculator.obtenerEtiquetaEscalon(variante, nuevaCantidad)
-                _carrito.value = _carrito.value.map {
-                    if (it.id == lineaExistente.id) {
-                        it.copy(cantidad = nuevaCantidad, precioUnitario = nuevoPrecio, etiquetaEscalon = nuevaEtiqueta)
-                    } else it
-                }
-            } else {
-                _carrito.value = _carrito.value + LineaCarrito(
-                    id = UUID.randomUUID().toString(),
-                    producto = variante,
-                    cantidad = cantidad,
-                    precioUnitario = precio,
-                    etiquetaEscalon = etiqueta
-                )
+    suspend fun obtenerEtiquetaEscalon(variante: ProductoEntity, cantidad: Int): String {
+        return precioCalculator.obtenerEtiquetaEscalon(variante, cantidad)
+    }
+
+    /**
+     * Agrega una variante al carrito con la cantidad y el PRECIO indicados explícitamente.
+     * El precio ya viene resuelto por la UI (que parte del escalón sugerido pero permite
+     * al vendedor sobrescribirlo manualmente antes de confirmar, ej. para un descuento puntual).
+     */
+    fun agregarAlCarrito(variante: ProductoEntity, cantidad: Int, precioUnitario: Double, etiquetaEscalon: String) {
+        if (cantidad <= 0 || precioUnitario < 0) return
+
+        val lineaExistente = _carrito.value.find { it.producto.id == variante.id }
+        if (lineaExistente != null) {
+            val nuevaCantidad = lineaExistente.cantidad + cantidad
+            _carrito.value = _carrito.value.map {
+                if (it.id == lineaExistente.id) {
+                    it.copy(cantidad = nuevaCantidad, precioUnitario = precioUnitario, etiquetaEscalon = etiquetaEscalon)
+                } else it
             }
-            limpiarBusqueda()
+        } else {
+            _carrito.value = _carrito.value + LineaCarrito(
+                id = UUID.randomUUID().toString(),
+                producto = variante,
+                cantidad = cantidad,
+                precioUnitario = precioUnitario,
+                etiquetaEscalon = etiquetaEscalon
+            )
         }
+        limpiarBusqueda()
     }
 
     fun quitarDelCarrito(lineaId: String) {
@@ -147,8 +176,6 @@ class VentaViewModel(private val app: POSApplication) : ViewModel() {
                 val ventaId = UUID.randomUUID().toString()
                 val ahora = System.currentTimeMillis()
                 val subtotalGeneral = lineas.sumOf { it.subtotal }
-                // El impuesto ya viene incluido conceptualmente por producto; aquí se
-                // deja en 0 a nivel de venta general y se documenta por línea si aplica.
                 val impuestosGeneral = lineas.sumOf {
                     it.subtotal * (it.producto.impuestoPorcentaje / 100.0)
                 }
