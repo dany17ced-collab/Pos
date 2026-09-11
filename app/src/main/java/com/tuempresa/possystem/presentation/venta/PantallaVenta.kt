@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -141,11 +142,18 @@ fun PantallaVenta(app: POSApplication, onVolver: () -> Unit) {
                     )
 
                     when (val resultado = resultadoBusqueda) {
+                        is ResultadoBusqueda.VariosResultados -> {
+                            ListaCoincidencias(
+                                productos = resultado.productos,
+                                onSeleccionar = { viewModel.elegirProducto(it) }
+                            )
+                        }
                         is ResultadoBusqueda.Encontrado -> {
                             SelectorVariante(
+                                viewModel = viewModel,
                                 variantes = resultado.variantes,
-                                onAgregar = { variante, cantidad ->
-                                    viewModel.agregarAlCarrito(variante, cantidad)
+                                onAgregar = { variante, cantidad, precio, etiqueta ->
+                                    viewModel.agregarAlCarrito(variante, cantidad, precio, etiqueta)
                                     textoBusqueda = ""
                                 },
                                 onCancelar = {
@@ -192,7 +200,7 @@ fun PantallaVenta(app: POSApplication, onVolver: () -> Unit) {
 
 @Composable
 private fun EncabezadoVenta(onVolver: () -> Unit) {
-  Row(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(20.dp),
@@ -256,15 +264,66 @@ private fun BarraBusqueda(
         }
     }
 }
+
+@Composable
+private fun ListaCoincidencias(
+    productos: List<ProductoEntity>,
+    onSeleccionar: (ProductoEntity) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp)
+    ) {
+        Text(
+            "¿Cuál de estos?",
+            color = TextoCremaApagado,
+            fontSize = 13.sp,
+            modifier = Modifier.padding(bottom = 8.dp)
+        )
+        productos.forEach { producto ->
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(FondoTarjeta)
+                    .clickable { onSeleccionar(producto) }
+                    .padding(14.dp)
+            ) {
+                Column {
+                    Text(producto.nombre, color = TextoCrema, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+                    if (producto.descripcion != null) {
+                        Text(producto.descripcion, color = TextoCremaApagado, fontSize = 13.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun SelectorVariante(
+    viewModel: VentaViewModel,
     variantes: List<ProductoEntity>,
-    onAgregar: (ProductoEntity, Int) -> Unit,
+    onAgregar: (ProductoEntity, Int, Double, String) -> Unit,
     onCancelar: () -> Unit
 ) {
     var varianteSeleccionada by remember { mutableStateOf<ProductoEntity?>(null) }
     var cantidadTexto by remember { mutableStateOf("1") }
+    var precioTexto by remember { mutableStateOf("") }
+    var etiquetaEscalon by remember { mutableStateOf("Unidad") }
+
+    // Cada vez que cambia la variante elegida o la cantidad escrita, se recalcula
+    // el precio SUGERIDO por escalón; el vendedor puede sobrescribirlo a mano después.
+    LaunchedEffect(varianteSeleccionada, cantidadTexto) {
+        val variante = varianteSeleccionada ?: return@LaunchedEffect
+        val cantidad = cantidadTexto.toIntOrNull() ?: 1
+        val sugerido = viewModel.calcularPrecioSugerido(variante, cantidad)
+        etiquetaEscalon = viewModel.obtenerEtiquetaEscalon(variante, cantidad)
+        precioTexto = "%.2f".format(sugerido)
+    }
 
     Column(
         modifier = Modifier
@@ -275,10 +334,9 @@ private fun SelectorVariante(
             .padding(16.dp)
     ) {
         if (variantes.size == 1 && variantes.first().talla == null) {
-            // Producto simple, sin variantes: se muestra directo el nombre
             val unico = variantes.first()
             Text(unico.nombre, color = TextoCrema, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-            varianteSeleccionada = unico
+            if (varianteSeleccionada == null) varianteSeleccionada = unico
         } else {
             Text("Elige talla / color", color = TextoCrema, fontSize = 16.sp, fontWeight = FontWeight.Medium)
             FlowRow(
@@ -321,14 +379,7 @@ private fun SelectorVariante(
                     modifier = Modifier
                         .padding(start = 12.dp)
                         .size(width = 80.dp, height = 52.dp),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = FondoCarbon,
-                        unfocusedContainerColor = FondoCarbon,
-                        focusedTextColor = TextoCrema,
-                        unfocusedTextColor = TextoCrema,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent
-                    ),
+                    colors = camposTextoColores(),
                     shape = RoundedCornerShape(10.dp)
                 )
                 Text(
@@ -336,6 +387,30 @@ private fun SelectorVariante(
                     color = TextoCremaApagado,
                     fontSize = 12.sp,
                     modifier = Modifier.padding(start = 12.dp)
+                )
+            }
+
+            Row(
+                modifier = Modifier.padding(top = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Precio (${etiquetaEscalon}):", color = TextoCremaApagado, fontSize = 14.sp)
+                TextField(
+                    value = precioTexto,
+                    onValueChange = { nuevo -> if (nuevo.all { it.isDigit() || it == '.' }) precioTexto = nuevo },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    modifier = Modifier
+                        .padding(start = 12.dp)
+                        .size(width = 100.dp, height = 52.dp),
+                    colors = camposTextoColores(),
+                    shape = RoundedCornerShape(10.dp)
+                )
+                Text(
+                    text = "editable",
+                    color = TextoCremaApagado,
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(start = 8.dp)
                 )
             }
 
@@ -351,7 +426,8 @@ private fun SelectorVariante(
                 Button(
                     onClick = {
                         val cantidad = cantidadTexto.toIntOrNull() ?: 1
-                        onAgregar(variante, cantidad)
+                        val precio = precioTexto.toDoubleOrNull() ?: 0.0
+                        onAgregar(variante, cantidad, precio, etiquetaEscalon)
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = AcentoTerracota),
                     modifier = Modifier.weight(1f)
@@ -402,12 +478,12 @@ private fun LineaCarritoItem(linea: LineaCarrito, onQuitar: () -> Unit) {
             Text(linea.producto.nombre, color = TextoCrema, fontSize = 14.sp, fontWeight = FontWeight.Medium)
             val detalle = buildString {
                 if (etiquetaVariante.isNotBlank()) append("$etiquetaVariante · ")
-                append("${linea.cantidad} × s/${"%.2f".format(linea.precioUnitario)} (${linea.etiquetaEscalon})")
+                append("${linea.cantidad} × S/ ${"%.2f".format(linea.precioUnitario)} (${linea.etiquetaEscalon})")
             }
             Text(detalle, color = TextoCremaApagado, fontSize = 12.sp)
         }
         Text(
-            text = "s/${"%.2f".format(linea.subtotal)}",
+            text = "S/ ${"%.2f".format(linea.subtotal)}",
             color = AcentoTerracota,
             fontSize = 15.sp,
             fontWeight = FontWeight.SemiBold
@@ -435,7 +511,7 @@ private fun PieCarrito(total: Double, habilitado: Boolean, onCobrar: () -> Unit)
         Column(modifier = Modifier.weight(1f)) {
             Text("Total", color = TextoCremaApagado, fontSize = 12.sp)
             Text(
-                "s/${"%.2f".format(total)}",
+                "S/ ${"%.2f".format(total)}",
                 color = TextoCrema,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold
@@ -490,7 +566,7 @@ private fun PantallaCheckout(
             modifier = Modifier.padding(top = 16.dp)
         )
         Text(
-            text = "s/${"%.2f".format(total)}",
+            text = "S/ ${"%.2f".format(total)}",
             color = AcentoTerracota,
             fontSize = 34.sp,
             fontWeight = FontWeight.Bold,
@@ -569,7 +645,7 @@ private fun PantallaCheckout(
                     val recibido = montoTexto.toDoubleOrNull()
                     if (recibido != null && recibido >= total) {
                         Text(
-                            text = "Cambio: s/${"%.2f".format(recibido - total)}",
+                            text = "Cambio: S/ ${"%.2f".format(recibido - total)}",
                             color = ColorExito,
                             fontSize = 14.sp,
                             modifier = Modifier.padding(top = 8.dp)
@@ -612,6 +688,17 @@ private fun PantallaCheckout(
         }
     }
 }
+
+@Composable
+private fun camposTextoColores() = TextFieldDefaults.colors(
+    focusedContainerColor = FondoCarbon,
+    unfocusedContainerColor = FondoCarbon,
+    focusedTextColor = TextoCrema,
+    unfocusedTextColor = TextoCrema,
+    focusedIndicatorColor = Color.Transparent,
+    unfocusedIndicatorColor = Color.Transparent,
+    cursorColor = AcentoTerracota
+)
 
 private fun etiquetaMetodoPago(metodo: MetodoPago): String = when (metodo) {
     MetodoPago.EFECTIVO -> "Efectivo"
