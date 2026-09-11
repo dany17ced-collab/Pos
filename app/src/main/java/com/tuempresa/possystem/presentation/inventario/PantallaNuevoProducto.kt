@@ -8,6 +8,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -66,7 +68,6 @@ fun PantallaNuevoProducto(app: POSApplication, onVolver: () -> Unit, onGuardado:
     val categorias by viewModel.categorias.collectAsState()
     val categoriaId by viewModel.categoriaId.collectAsState()
     val precioCompraTexto by viewModel.precioCompraTexto.collectAsState()
-    val escalones by viewModel.escalones.collectAsState()
     val colores by viewModel.colores.collectAsState()
     val estadoGuardado by viewModel.estadoGuardado.collectAsState()
 
@@ -105,8 +106,8 @@ fun PantallaNuevoProducto(app: POSApplication, onVolver: () -> Unit, onGuardado:
             }
         } else if (mostrandoAgregarColor) {
             PantallaAgregarColor(
-                onGuardar = { color, stockPorTalla ->
-                    viewModel.agregarColor(color, stockPorTalla)
+                onGuardar = { color, tallas ->
+                    viewModel.agregarColor(color, tallas)
                     mostrandoAgregarColor = false
                 },
                 onCancelar = { mostrandoAgregarColor = false }
@@ -155,11 +156,6 @@ fun PantallaNuevoProducto(app: POSApplication, onVolver: () -> Unit, onGuardado:
                     onCategoriaSeleccionada = viewModel::seleccionarCategoria,
                     precioCompraTexto = precioCompraTexto,
                     onPrecioCompraCambiado = viewModel::actualizarPrecioCompra
-                )
-
-                SeccionEscalonesPrecio(
-                    escalones = escalones,
-                    onPrecioCambiado = viewModel::actualizarPrecioEscalon
                 )
 
                 SeccionColores(
@@ -215,7 +211,7 @@ private fun SeccionDatosGenerales(
     Column(modifier = Modifier.padding(horizontal = 20.dp)) {
         CampoTexto(valor = nombre, onCambio = onNombreCambiado, placeholder = "Nombre del producto")
         Spacer(modifier = Modifier.height(10.dp))
-        CampoTexto(valor = descripcion, onCambio = onDescripcionCambiada, placeholder = "Descripción (opcional)")
+        CampoTexto(valor = descripcion, onCambio = onDescripcionCambiada, placeholder = "Descripción / tipo de tela (ej. franela, algodón)")
         Spacer(modifier = Modifier.height(10.dp))
 
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -258,7 +254,7 @@ private fun SeccionDatosGenerales(
                             .background(if (seleccionada) AcentoTerracota else FondoTarjeta)
                             .clickable { onCategoriaSeleccionada(if (seleccionada) null else categoria.id) }
                             .padding(horizontal = 14.dp, vertical = 10.dp)
-                            ) {
+                    ) {
                         Text(
                             categoria.nombre,
                             color = if (seleccionada) FondoCarbon else TextoCrema,
@@ -266,53 +262,6 @@ private fun SeccionDatosGenerales(
                         )
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SeccionEscalonesPrecio(
-    escalones: List<EscalonEnCaptura>,
-    onPrecioCambiado: (String, String) -> Unit
-) {
-    Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
-        Text("Precios por cantidad", color = TextoCrema, fontSize = 15.sp, fontWeight = FontWeight.Medium)
-        Text(
-            "Aplican a todas las tallas y colores de este producto",
-            color = TextoCremaApagado,
-            fontSize = 12.sp,
-            modifier = Modifier.padding(top = 2.dp, bottom = 10.dp)
-        )
-        escalones.forEach { escalon ->
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = escalon.etiqueta,
-                    color = TextoCrema,
-                    fontSize = 14.sp,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = "≥${escalon.cantidadMinima}",
-                    color = TextoCremaApagado,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(end = 10.dp)
-                )
-                TextField(
-                    value = escalon.precioTexto,
-                    onValueChange = { onPrecioCambiado(escalon.etiqueta, it) },
-                    placeholder = { Text("S/", color = TextoCremaApagado) },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier.size(width = 100.dp, height = 52.dp),
-                    colors = camposTextoColores(),
-                    shape = RoundedCornerShape(10.dp)
-                )
             }
         }
     }
@@ -327,7 +276,7 @@ private fun SeccionColores(
     Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "Colores y tallas",
+                "Colores, tallas y precios",
                 color = TextoCrema,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Medium,
@@ -364,8 +313,9 @@ private fun SeccionColores(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(colorCaptura.color, color = TextoCrema, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                        val resumen = colorCaptura.stockPorTalla.entries.joinToString(", ") { (talla, stock) ->
-                            "T$talla: $stock"
+                        val resumen = colorCaptura.tallas.joinToString(", ") { t ->
+                            val precioUnidad = t.escalones.find { it.etiqueta == "Unidad" }?.precioTexto ?: "?"
+                            "T${t.talla}: ${t.stockTexto.ifBlank { "0" }} pzs · S/$precioUnidad"
                         }
                         Text(resumen, color = TextoCremaApagado, fontSize = 12.sp)
                     }
@@ -381,14 +331,16 @@ private fun SeccionColores(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun PantallaAgregarColor(
-    onGuardar: (String, Map<String, Int>) -> Unit,
+    onGuardar: (String, List<TallaEnCaptura>) -> Unit,
     onCancelar: () -> Unit
 ) {
     var color by remember { mutableStateOf("") }
-    var tallasSeleccionadas by remember { mutableStateOf(setOf<String>()) }
-    var stockPorTalla by remember { mutableStateOf(mapOf<String, String>()) }
+    // Un TallaEnCaptura completo por cada talla marcada; se guarda en un mapa
+    // mutable local para poder editar stock y precios independientemente.
+    var tallasCapturadas by remember { mutableStateOf(mapOf<String, TallaEnCaptura>()) }
 
     Surface(modifier = Modifier.fillMaxSize(), color = FondoCarbon) {
         Column(
@@ -414,56 +366,110 @@ private fun PantallaAgregarColor(
             CampoTexto(valor = color, onCambio = { color = it }, placeholder = "Nombre del color (ej. Vino, Azul)")
 
             Text(
-                "Tallas disponibles",
+                "Tallas disponibles — marca y define stock y precios de cada una",
                 color = TextoCremaApagado,
-                fontSize = 13.sp,
+                fontSize = 12.sp,
                 modifier = Modifier.padding(top = 20.dp, bottom = 8.dp)
             )
 
             TALLAS_DISPONIBLES.forEach { talla ->
-                val marcada = talla in tallasSeleccionadas
-                Row(
+                val capturaActual = tallasCapturadas[talla]
+                val marcada = capturaActual != null
+
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(vertical = 4.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (marcada) FondoTarjeta else Color.Transparent)
+                        .padding(if (marcada) 12.dp else 0.dp)
                 ) {
-                    Checkbox(
-                        checked = marcada,
-                        onCheckedChange = { activo ->
-                            tallasSeleccionadas = if (activo) tallasSeleccionadas + talla else tallasSeleccionadas - talla
-                        },
-                        colors = CheckboxDefaults.colors(checkedColor = AcentoTerracota, uncheckedColor = TextoCremaApagado)
-                    )
-                    Text("Talla $talla", color = TextoCrema, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                    if (marcada) {
-                        TextField(
-                            value = stockPorTalla[talla] ?: "",
-                            onValueChange = { nuevo ->
-                                if (nuevo.all { it.isDigit() }) {
-                                    stockPorTalla = stockPorTalla + (talla to nuevo)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = marcada,
+                            onCheckedChange = { activo ->
+                                tallasCapturadas = if (activo) {
+                                    tallasCapturadas + (talla to TallaEnCaptura(talla = talla))
+                                } else {
+                                    tallasCapturadas - talla
                                 }
                             },
-                            placeholder = { Text("Stock", color = TextoCremaApagado) },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.size(width = 90.dp, height = 52.dp),
-                            colors = camposTextoColores(),
-                            shape = RoundedCornerShape(10.dp)
+                            colors = CheckboxDefaults.colors(checkedColor = AcentoTerracota, uncheckedColor = TextoCremaApagado)
                         )
+                        Text("Talla $talla", color = TextoCrema, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    }
+
+                    if (capturaActual != null) {
+                        Row(
+                            modifier = Modifier.padding(top = 8.dp, start = 40.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("Stock:", color = TextoCremaApagado, fontSize = 13.sp)
+                            TextField(
+                                value = capturaActual.stockTexto,
+                                onValueChange = { nuevo ->
+                                    if (nuevo.all { it.isDigit() }) {
+                                        tallasCapturadas = tallasCapturadas + (talla to capturaActual.copy(stockTexto = nuevo))
+                                    }
+                                },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                modifier = Modifier
+                                    .padding(start = 8.dp)
+                                    .size(width = 90.dp, height = 48.dp),
+                                colors = camposTextoColores(),
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                        }
+
+                        Text(
+                            "Precios por cantidad",
+                            color = TextoCremaApagado,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(top = 10.dp, start = 40.dp, bottom = 4.dp)
+                        )
+                        FlowRow(
+                            modifier = Modifier.padding(start = 40.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            capturaActual.escalones.forEach { escalon ->
+                                Column {
+                                    Text(
+                                        "${escalon.etiqueta} (≥${escalon.cantidadMinima})",
+                                        color = TextoCremaApagado,
+                                        fontSize = 10.sp
+                                    )
+                                    TextField(
+                                        value = escalon.precioTexto,
+                                        onValueChange = { nuevoPrecio ->
+                                            val nuevosEscalones = capturaActual.escalones.map {
+                                                if (it.etiqueta == escalon.etiqueta) it.copy(precioTexto = nuevoPrecio) else it
+                                            }
+                                            tallasCapturadas = tallasCapturadas + (talla to capturaActual.copy(escalones = nuevosEscalones))
+                                        },
+                                        placeholder = { Text("S/", color = TextoCremaApagado) },
+                                        singleLine = true,
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                        modifier = Modifier.size(width = 90.dp, height = 48.dp),
+                                        colors = camposTextoColores(),
+                                        shape = RoundedCornerShape(10.dp)
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
 
             val puedeGuardar = color.isNotBlank() &&
-                tallasSeleccionadas.isNotEmpty() &&
-                tallasSeleccionadas.all { (stockPorTalla[it]?.toIntOrNull() ?: -1) >= 0 }
+                tallasCapturadas.isNotEmpty() &&
+                tallasCapturadas.values.all { t ->
+                    t.escalones.find { it.etiqueta == "Unidad" }?.precioTexto?.toDoubleOrNull() != null
+                }
 
             Button(
-                onClick = {
-                    val mapa = tallasSeleccionadas.associateWith { stockPorTalla[it]?.toIntOrNull() ?: 0 }
-                    onGuardar(color, mapa)
-                },
+                onClick = { onGuardar(color, tallasCapturadas.values.toList()) },
                 enabled = puedeGuardar,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = AcentoTerracota,
