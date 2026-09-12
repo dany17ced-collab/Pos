@@ -23,6 +23,10 @@ interface CategoriaDao {
     @Query("SELECT * FROM categorias WHERE eliminado = 0 ORDER BY nombre ASC")
     fun observarTodas(): Flow<List<CategoriaEntity>>
 
+    /** Igual que observarTodas, pero de un solo disparo — usada para generar reportes. */
+    @Query("SELECT * FROM categorias WHERE eliminado = 0 ORDER BY nombre ASC")
+    suspend fun obtenerTodas(): List<CategoriaEntity>
+
     @Query("SELECT * FROM categorias WHERE id = :id LIMIT 1")
     suspend fun obtenerPorId(id: String): CategoriaEntity?
 
@@ -32,3 +36,4 @@ interface CategoriaDao {
     @Query("UPDATE categorias SET sincronizado = 1 WHERE id IN (:ids)")
     suspend fun marcarSincronizados(ids: List<String>)
 }
+
