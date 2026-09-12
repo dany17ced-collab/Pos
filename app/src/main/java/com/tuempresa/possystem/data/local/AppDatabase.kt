@@ -36,7 +36,7 @@ import com.tuempresa.possystem.data.local.entity.VentaEntity
         UsuarioEntity::class
     ],
     version = 3,
-    exportSchema = true
+    exportSchema = false
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
