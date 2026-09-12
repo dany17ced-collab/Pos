@@ -169,7 +169,8 @@ fun PantallaReportes(
                 color = TextoCrema,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 20.dp, top = 20.dp, bottom = 8.dp)
+                // ✅ CORREGIDO: Usando start, top, end, bottom
+                modifier = Modifier.padding(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 8.dp)
             )
             
             if (masVendidos.isEmpty()) {
@@ -221,7 +222,8 @@ fun PantallaReportes(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, top = 20.dp, bottom = 8.dp),
+                    // ✅ CORREGIDO: Usando start, top, end, bottom
+                    .padding(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
