@@ -35,7 +35,7 @@ import com.tuempresa.possystem.data.local.entity.VentaEntity
         PrecioEscalonEntity::class,
         UsuarioEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -119,6 +119,69 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * Migración 2 -> 3: rehace `cortes_caja` con el schema real que usa
+         * ReportesViewModel (cajaId, fechaInicio, totalImpuestos, efectivoEsperado,
+         * efectivoContado, usuarioId, sincronizado) y cambia su id de entero
+         * autogenerado a String (UUID), igual que el resto de tablas nuevas.
+         *
+         * Como cambia el tipo de la clave primaria, no se puede hacer con
+         * ALTER TABLE: se crea la tabla nueva y se migran los cortes viejos
+         * dándoles un id de texto nuevo y cajaId = 'caja-principal' (única caja
+         * que ha existido hasta ahora). fechaInicio no existía antes, así que
+         * para los cortes históricos se aproxima con su propia fechaCorte.
+         */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS cortes_caja_nueva (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        cajaId TEXT NOT NULL,
+                        tipo TEXT NOT NULL,
+                        fechaInicio INTEGER NOT NULL,
+                        fechaCorte INTEGER NOT NULL,
+                        numeroTransacciones INTEGER NOT NULL,
+                        totalVentas REAL NOT NULL,
+                        totalEfectivo REAL NOT NULL,
+                        totalTarjeta REAL NOT NULL,
+                        totalTransferencia REAL NOT NULL,
+                        totalDescuentos REAL NOT NULL,
+                        totalImpuestos REAL NOT NULL,
+                        fondoInicial REAL NOT NULL,
+                        efectivoEsperado REAL NOT NULL,
+                        efectivoContado REAL,
+                        diferencia REAL,
+                        usuarioId TEXT,
+                        creadoEn INTEGER NOT NULL,
+                        sincronizado INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO cortes_caja_nueva (
+                        id, cajaId, tipo, fechaInicio, fechaCorte, numeroTransacciones,
+                        totalVentas, totalEfectivo, totalTarjeta, totalTransferencia,
+                        totalDescuentos, totalImpuestos, fondoInicial, efectivoEsperado,
+                        efectivoContado, diferencia, usuarioId, creadoEn, sincronizado
+                    )
+                    SELECT
+                        lower(hex(randomblob(16))), 'caja-principal', tipo, fechaCorte, fechaCorte,
+                        numeroTransacciones, totalVentas, totalEfectivo, totalTarjeta,
+                        totalTransferencia, totalDescuentos, 0.0, fondoInicial,
+                        fondoInicial + totalEfectivo, efectivoDeclarado, diferencia, NULL,
+                        fechaCorte, 0
+                    FROM cortes_caja
+                    """.trimIndent()
+                )
+                db.execSQL("DROP TABLE cortes_caja")
+                db.execSQL("ALTER TABLE cortes_caja_nueva RENAME TO cortes_caja")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_cortes_caja_cajaId ON cortes_caja(cajaId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_cortes_caja_fechaCorte ON cortes_caja(fechaCorte)")
+            }
+        }
+
         fun obtenerInstancia(context: Context): AppDatabase {
             return instancia ?: synchronized(this) {
                 instancia ?: Room.databaseBuilder(
@@ -126,7 +189,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     NOMBRE_DB
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                     .also { instancia = it }
             }
