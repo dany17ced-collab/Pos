@@ -25,6 +25,7 @@ import com.tuempresa.possystem.presentation.inventario.PantallaEditarPrecio
 import com.tuempresa.possystem.presentation.inventario.PantallaEntradaMercaderia
 import com.tuempresa.possystem.presentation.inventario.PantallaInventario
 import com.tuempresa.possystem.presentation.inventario.PantallaNuevoProducto
+import com.tuempresa.possystem.presentation.reportes.PantallaReportes
 import com.tuempresa.possystem.presentation.venta.PantallaVenta
 
 private object Rutas {
@@ -36,6 +37,7 @@ private object Rutas {
     const val NUEVO_PRODUCTO = "nuevo_producto"
     const val ENTRADA_MERCADERIA = "entrada_mercaderia"
     const val EDITAR_PRECIO = "editar_precio/{productoId}"
+    const val REPORTES = "reportes"
 }
 
 @Composable
@@ -98,6 +100,7 @@ fun GrafoNavegacionPrincipal(app: POSApplication) {
                     when (ruta) {
                         "venta" -> navController.navigate(Rutas.VENTA)
                         "inventario" -> navController.navigate(Rutas.INVENTARIO)
+                        "reportes" -> navController.navigate(Rutas.REPORTES)
                         else -> navController.navigate("proximamente/$ruta")
                     }
                 },
@@ -130,6 +133,10 @@ fun GrafoNavegacionPrincipal(app: POSApplication) {
                 onVolver = { navController.popBackStack() },
                 onGuardado = { navController.popBackStack() }
             )
+        }
+
+        composable(Rutas.REPORTES) {
+            PantallaReportes(app = app, onVolver = { navController.popBackStack() })
         }
 
         composable(Rutas.NUEVO_PRODUCTO) {
