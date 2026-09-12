@@ -7,6 +7,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -22,34 +25,36 @@ import com.tuempresa.possystem.POSApplication
 import com.tuempresa.possystem.data.local.entity.RolUsuario
 import com.tuempresa.possystem.data.local.entity.UsuarioEntity
 import com.tuempresa.possystem.presentation.inventario.fabricaSimple
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 private val FondoCarbon = Color(0xFF221B1D)
 private val FondoTarjeta = Color(0xFF2E2427)
 private val AcentoTerracota = Color(0xFFD98E73)
 private val TextoCrema = Color(0xFFF3E9E1)
 private val TextoCremaApagado = Color(0xFFB6A199)
-private val ColorExito = Color(0xFF8FBF8A)
 private val ColorError = Color(0xFFE08585)
+
+private val formatoFechaHora = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("es", "PE"))
 
 @Composable
 fun PantallaUsuarios(
     app: POSApplication,
-    onVolver: () -> Unit,
-    onEditarUsuario: (UsuarioEntity) -> Unit = {},
-    onNuevoUsuario: () -> Unit = {}
+    onVolver: () -> Unit
 ) {
     val viewModel: UsuariosViewModel = viewModel(
-        factory = fabricaSimple { UsuariosViewModel(app.usuarioRepository) }
+        factory = fabricaSimple { UsuariosViewModel(app.usuarioRepository, app.authRepository) }
     )
-    
+
     val estadoUsuarios by viewModel.estadoUsuarios.collectAsState()
     val usuarios by viewModel.usuariosFiltrados.collectAsState()
     val estadoOperacion by viewModel.estadoOperacion.collectAsState()
-    
+
     var mostrarDialogoUsuario by remember { mutableStateOf(false) }
     var usuarioEditar by remember { mutableStateOf<UsuarioEntity?>(null) }
     var mostrarConfirmacionEliminar by remember { mutableStateOf<UsuarioEntity?>(null) }
-    
+
     LaunchedEffect(estadoOperacion) {
         if (estadoOperacion is EstadoOperacionUsuario.Exitoso) {
             mostrarDialogoUsuario = false
@@ -57,10 +62,9 @@ fun PantallaUsuarios(
             viewModel.limpiarEstadoOperacion()
         }
     }
-    
+
     Surface(modifier = Modifier.fillMaxSize(), color = FondoCarbon) {
         Column(modifier = Modifier.fillMaxSize()) {
-            // Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -92,13 +96,12 @@ fun PantallaUsuarios(
                     Text("+", fontSize = 24.sp, color = FondoCarbon)
                 }
             }
-            
-            // Barra de búsqueda y filtros
+
             Column(modifier = Modifier.padding(horizontal = 20.dp)) {
                 TextField(
                     value = viewModel.textoBusqueda,
                     onValueChange = { viewModel.buscarUsuarios(it) },
-                    placeholder = { Text("Buscar por nombre o usuario...") },
+                    placeholder = { Text("Buscar por nombre...") },
                     modifier = Modifier.fillMaxWidth(),
                     colors = TextFieldDefaults.colors(
                         focusedContainerColor = FondoTarjeta,
@@ -108,8 +111,7 @@ fun PantallaUsuarios(
                     ),
                     singleLine = true
                 )
-                
-                // Filtros por rol
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -125,8 +127,8 @@ fun PantallaUsuarios(
                         )
                     )
                     FilterChip(
-                        selected = viewModel.rolFiltro == RolUsuario.ADMINISTRADOR,
-                        onClick = { viewModel.filtrarPorRol(RolUsuario.ADMINISTRADOR) },
+                        selected = viewModel.rolFiltro == RolUsuario.ADMIN,
+                        onClick = { viewModel.filtrarPorRol(RolUsuario.ADMIN) },
                         label = { Text("Admin") },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = AcentoTerracota
@@ -140,18 +142,9 @@ fun PantallaUsuarios(
                             selectedContainerColor = AcentoTerracota
                         )
                     )
-                    FilterChip(
-                        selected = viewModel.rolFiltro == RolUsuario.SUPERVISOR,
-                        onClick = { viewModel.filtrarPorRol(RolUsuario.SUPERVISOR) },
-                        label = { Text("Supervisor") },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = AcentoTerracota
-                        )
-                    )
                 }
             }
-            
-            // Lista de usuarios
+
             when (val estado = estadoUsuarios) {
                 is EstadoUsuarios.Cargando -> {
                     Box(
@@ -208,8 +201,7 @@ fun PantallaUsuarios(
             }
         }
     }
-    
-    // Diálogo para agregar/editar usuario
+
     if (mostrarDialogoUsuario) {
         DialogoAgregarEditarUsuario(
             usuario = usuarioEditar,
@@ -218,25 +210,23 @@ fun PantallaUsuarios(
                 usuarioEditar = null
                 viewModel.limpiarEstadoOperacion()
             },
-            onGuardar = { nombre, nombreUsuario, contrasena, rol ->
+            onGuardar = { nombre, pin, rol ->
                 viewModel.guardarUsuario(
-                    id = usuarioEditar?.id ?: 0,
+                    usuarioExistente = usuarioEditar,
                     nombre = nombre,
-                    nombreUsuario = nombreUsuario,
-                    contrasena = contrasena,
+                    pin = pin,
                     rol = rol
                 )
             },
             estadoOperacion = estadoOperacion
         )
     }
-    
-    // Diálogo de confirmación para eliminar
+
     mostrarConfirmacionEliminar?.let { usuario ->
         AlertDialog(
             onDismissRequest = { mostrarConfirmacionEliminar = null },
-            title = { Text("Eliminar usuario") },
-            text = { Text("¿Estás seguro de eliminar a ${usuario.nombre}? Esta acción no se puede deshacer.") },
+            title = { Text("Desactivar usuario") },
+            text = { Text("¿Estás seguro de desactivar a ${usuario.nombre}? Ya no podrá iniciar sesión.") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -247,7 +237,7 @@ fun PantallaUsuarios(
                         contentColor = ColorError
                     )
                 ) {
-                    Text("Eliminar")
+                    Text("Desactivar")
                 }
             },
             dismissButton = {
@@ -273,7 +263,6 @@ private fun TarjetaUsuario(
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Avatar
         Box(
             modifier = Modifier
                 .size(48.dp)
@@ -288,7 +277,7 @@ private fun TarjetaUsuario(
                 fontWeight = FontWeight.Bold
             )
         }
-        
+
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -309,39 +298,32 @@ private fun TarjetaUsuario(
                     )
                 }
             }
-            Text(
-                "@${usuario.nombreUsuario}",
-                color = TextoCremaApagado,
-                fontSize = 13.sp
-            )
             Row(
                 modifier = Modifier.padding(top = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 BadgeRol(rol = usuario.rol)
-                if (usuario.ultimoAcceso != null) {
-                    Text(
-                        "Último acceso: ${formatoFechaHora.format(java.util.Date(usuario.ultimoAcceso))}",
-                        color = TextoCremaApagado,
-                        fontSize = 11.sp
-                    )
-                }
+                Text(
+                    "Creado: ${formatoFechaHora.format(Date(usuario.creadoEn))}",
+                    color = TextoCremaApagado,
+                    fontSize = 11.sp
+                )
             }
         }
-        
-        // Botones de acción
+
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             IconButton(onClick = onEditar) {
                 Icon(
-                    androidx.compose.material.icons.Icons.Default.Edit,
+                    Icons.Default.Edit,
                     contentDescription = "Editar",
                     tint = AcentoTerracota
                 )
             }
             IconButton(onClick = onEliminar) {
                 Icon(
-                    androidx.compose.material.icons.Icons.Default.Delete,
-                    contentDescription = "Eliminar",
+                    Icons.Default.Delete,
+                    contentDescription = "Desactivar",
                     tint = ColorError
                 )
             }
@@ -352,11 +334,10 @@ private fun TarjetaUsuario(
 @Composable
 private fun BadgeRol(rol: RolUsuario) {
     val (color, texto) = when (rol) {
-        RolUsuario.ADMINISTRADOR -> Color(0xFFFF6B6B) to "Admin"
+        RolUsuario.ADMIN -> Color(0xFFFF6B6B) to "Admin"
         RolUsuario.VENDEDOR -> AcentoTerracota to "Vendedor"
-        RolUsuario.SUPERVISOR -> Color(0xFF4ECDC4) to "Supervisor"
     }
-    
+
     Surface(
         color = color.copy(alpha = 0.2f),
         shape = RoundedCornerShape(4.dp)
@@ -376,15 +357,17 @@ private fun BadgeRol(rol: RolUsuario) {
 private fun DialogoAgregarEditarUsuario(
     usuario: UsuarioEntity?,
     onCancelar: () -> Unit,
-    onGuardar: (String, String, String, RolUsuario) -> Unit,
+    onGuardar: (String, String, RolUsuario) -> Unit,
     estadoOperacion: EstadoOperacionUsuario
 ) {
     var nombre by remember { mutableStateOf(usuario?.nombre ?: "") }
-    var nombreUsuario by remember { mutableStateOf(usuario?.nombreUsuario ?: "") }
-    var contrasena by remember { mutableStateOf("") }
+    var pin by remember { mutableStateOf("") }
     var rol by remember { mutableStateOf(usuario?.rol ?: RolUsuario.VENDEDOR) }
-    var mostrarContrasena by remember { mutableStateOf(false) }
-    
+    var mostrarPin by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) }
+
+    val pinValido = usuario != null || (pin.length in 4..6)
+
     AlertDialog(
         onDismissRequest = onCancelar,
         title = { Text(if (usuario == null) "Nuevo usuario" else "Editar usuario") },
@@ -399,44 +382,30 @@ private fun DialogoAgregarEditarUsuario(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
-                
+
                 TextField(
-                    value = nombreUsuario,
-                    onValueChange = { nombreUsuario = it },
-                    label = { Text("Nombre de usuario") },
+                    value = pin,
+                    onValueChange = { if (it.length <= 6) pin = it.filter(Char::isDigit) },
+                    label = { Text(if (usuario != null) "Nuevo PIN (opcional)" else "PIN (4 a 6 dígitos)") },
                     modifier = Modifier.fillMaxWidth(),
-                    singleLine = true
-                )
-                
-                TextField(
-                    value = contrasena,
-                    onValueChange = { contrasena = it },
-                    label = { Text(if (usuario != null && contrasena.isEmpty()) "Dejar en blanco para mantener" else "Contraseña") },
-                    modifier = Modifier.fillMaxWidth(),
-                    visualTransformation = if (mostrarContrasena) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    visualTransformation = if (mostrarPin) androidx.compose.ui.text.input.VisualTransformation.None else androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                     singleLine = true,
                     trailingIcon = {
-                        IconButton(onClick = { mostrarContrasena = !mostrarContrasena }) {
-                            Icon(
-                                if (mostrarContrasena) androidx.compose.material.icons.Icons.Default.Visibility
-                                else androidx.compose.material.icons.Icons.Default.VisibilityOff,
-                                contentDescription = if (mostrarContrasena) "Ocultar" else "Mostrar"
-                            )
+                        IconButton(onClick = { mostrarPin = !mostrarPin }) {
+                            Text(if (mostrarPin) "Ocultar" else "Ver", fontSize = 11.sp)
                         }
                     }
                 )
-                
-                var expanded by remember { mutableStateOf(false) }
+
                 ExposedDropdownMenuBox(
                     expanded = expanded,
                     onExpandedChange = { expanded = it }
                 ) {
                     OutlinedTextField(
                         value = when (rol) {
-                            RolUsuario.ADMINISTRADOR -> "Administrador"
+                            RolUsuario.ADMIN -> "Administrador"
                             RolUsuario.VENDEDOR -> "Vendedor"
-                            RolUsuario.SUPERVISOR -> "Supervisor"
                         },
                         onValueChange = {},
                         readOnly = true,
@@ -446,7 +415,7 @@ private fun DialogoAgregarEditarUsuario(
                             .menuAnchor(),
                         trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) }
                     )
-                    
+
                     ExposedDropdownMenu(
                         expanded = expanded,
                         onDismissRequest = { expanded = false }
@@ -454,7 +423,7 @@ private fun DialogoAgregarEditarUsuario(
                         DropdownMenuItem(
                             text = { Text("Administrador") },
                             onClick = {
-                                rol = RolUsuario.ADMINISTRADOR
+                                rol = RolUsuario.ADMIN
                                 expanded = false
                             }
                         )
@@ -465,16 +434,9 @@ private fun DialogoAgregarEditarUsuario(
                                 expanded = false
                             }
                         )
-                        DropdownMenuItem(
-                            text = { Text("Supervisor") },
-                            onClick = {
-                                rol = RolUsuario.SUPERVISOR
-                                expanded = false
-                            }
-                        )
                     }
                 }
-                
+
                 if (estadoOperacion is EstadoOperacionUsuario.Error) {
                     Text(
                         estadoOperacion.mensaje,
@@ -487,15 +449,23 @@ private fun DialogoAgregarEditarUsuario(
         confirmButton = {
             TextButton(
                 onClick = {
-                    if (nombre.isNotEmpty() && nombreUsuario.isNotEmpty() && 
-                        (usuario != null || contrasena.isNotEmpty())) {
-                        onGuardar(nombre, nombreUsuario, contrasena, rol)
+                    if (nombre.isNotEmpty() && pinValido) {
+                        onGuardar(nombre, pin, rol)
                     }
                 },
                 enabled = estadoOperacion !is EstadoOperacionUsuario.Procesando &&
-                        nombre.isNotEmpty() && nombreUsuario.isNotEmpty() &&
-                        (usuario != null || contrasena.isNotEmpty())
+                        nombre.isNotEmpty() && pinValido
             ) {
                 Text(
-                    if (estadoOperacion is EstadoOperacionUsuario.Procesando) "Guardando..." 
-                    else if (usuario ==
+                    if (estadoOperacion is EstadoOperacionUsuario.Procesando) "Guardando..."
+                    else "Guardar"
+                )
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onCancelar) {
+                Text("Cancelar")
+            }
+        }
+    )
+}
