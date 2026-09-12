@@ -7,37 +7,34 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface UsuarioDao {
-    
-    @Query("SELECT * FROM usuarios WHERE activo = 1 ORDER BY nombre")
-    fun obtenerTodosUsuarios(): Flow<List<UsuarioEntity>>
-    
+
+    @Query("SELECT * FROM usuarios WHERE activo = 1 AND eliminado = 0 ORDER BY nombre")
+    fun obtenerTodosUsuariosFlow(): Flow<List<UsuarioEntity>>
+
+    @Query("SELECT * FROM usuarios WHERE activo = 1 AND eliminado = 0")
+    suspend fun obtenerTodosActivos(): List<UsuarioEntity>
+
     @Query("SELECT * FROM usuarios WHERE id = :id")
-    suspend fun obtenerUsuarioPorId(id: Long): UsuarioEntity?
-    
-    @Query("SELECT * FROM usuarios WHERE nombreUsuario = :nombreUsuario AND contrasena = :contrasena AND activo = 1 LIMIT 1")
-    suspend fun autenticarUsuario(nombreUsuario: String, contrasena: String): UsuarioEntity?
-    
-    @Query("SELECT * FROM usuarios WHERE rol = :rol AND activo = 1 ORDER BY nombre")
+    suspend fun obtenerUsuarioPorId(id: String): UsuarioEntity?
+
+    @Query("SELECT * FROM usuarios WHERE rol = :rol AND activo = 1 AND eliminado = 0 ORDER BY nombre")
     fun obtenerUsuariosPorRol(rol: RolUsuario): Flow<List<UsuarioEntity>>
-    
-    @Query("SELECT COUNT(*) FROM usuarios WHERE activo = 1")
+
+    @Query("SELECT COUNT(*) FROM usuarios WHERE activo = 1 AND eliminado = 0")
     fun contarUsuariosActivos(): Flow<Int>
-    
+
+    @Query("SELECT COUNT(*) FROM usuarios WHERE rol = 'ADMIN' AND activo = 1 AND eliminado = 0")
+    suspend fun contarAdminsActivos(): Int
+
+    @Query("SELECT * FROM usuarios WHERE nombre = :nombre LIMIT 1")
+    suspend fun existeNombre(nombre: String): UsuarioEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertarUsuario(usuario: UsuarioEntity): Long
-    
+    suspend fun insertar(usuario: UsuarioEntity)
+
     @Update
-    suspend fun actualizarUsuario(usuario: UsuarioEntity)
-    
-    @Delete
-    suspend fun eliminarUsuario(usuario: UsuarioEntity)
-    
-    @Query("UPDATE usuarios SET activo = 0 WHERE id = :id")
-    suspend fun desactivarUsuario(id: Long)
-    
-    @Query("UPDATE usuarios SET ultimoAcceso = :fecha WHERE id = :id")
-    suspend fun actualizarUltimoAcceso(id: Long, fecha: Long = System.currentTimeMillis())
-    
-    @Query("SELECT * FROM usuarios WHERE nombreUsuario = :nombreUsuario LIMIT 1")
-    suspend fun existeNombreUsuario(nombreUsuario: String): UsuarioEntity?
+    suspend fun actualizar(usuario: UsuarioEntity)
+
+    @Query("UPDATE usuarios SET activo = 0, actualizadoEn = :fecha, sincronizado = 0 WHERE id = :id")
+    suspend fun desactivarUsuario(id: String, fecha: Long = System.currentTimeMillis())
 }
