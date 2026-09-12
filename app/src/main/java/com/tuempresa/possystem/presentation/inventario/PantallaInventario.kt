@@ -50,7 +50,8 @@ fun PantallaInventario(
     app: POSApplication,
     onVolver: () -> Unit,
     onNuevoProducto: () -> Unit,
-    onEntradaMercaderia: () -> Unit
+    onEntradaMercaderia: () -> Unit,
+    onEditarPrecio: (String) -> Unit
 ) {
     val viewModel: InventarioViewModel = viewModel(factory = fabricaSimple { InventarioViewModel(app) })
     val productos by viewModel.productos.collectAsState()
@@ -117,7 +118,8 @@ fun PantallaInventario(
                     items(productos, key = { it.id }) { producto ->
                         TarjetaProducto(
                             producto = producto,
-                            onEliminar = { productoAEliminar = producto }
+                            onEliminar = { productoAEliminar = producto },
+                            onEditarPrecio = { onEditarPrecio(producto.id) }
                         )
                     }
                 }
@@ -151,7 +153,11 @@ fun PantallaInventario(
 }
 
 @Composable
-private fun TarjetaProducto(producto: ProductoEntity, onEliminar: () -> Unit) {
+private fun TarjetaProducto(
+    producto: ProductoEntity,
+    onEliminar: () -> Unit,
+    onEditarPrecio: () -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -177,6 +183,13 @@ private fun TarjetaProducto(producto: ProductoEntity, onEliminar: () -> Unit) {
                 modifier = Modifier.padding(top = 6.dp)
             )
         }
+        Text(
+            text = "✏️",
+            fontSize = 18.sp,
+            modifier = Modifier
+                .padding(start = 12.dp)
+                .clickable(onClick = onEditarPrecio)
+        )
         Text(
             text = "🗑",
             fontSize = 18.sp,
