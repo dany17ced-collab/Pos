@@ -39,6 +39,25 @@ interface DetalleVentaDao {
     )
     fun observarProductosMasVendidos(desde: Long, hasta: Long, limite: Int = 20): Flow<List<ProductoMasVendido>>
 
+    /** Igual que observarProductosMasVendidos, pero de un solo disparo — usada para generar reportes. */
+    @Query(
+        """
+        SELECT 
+            dv.productoId as productoId,
+            dv.nombreProducto as nombreProducto,
+            SUM(dv.cantidad) as unidadesVendidas,
+            SUM(dv.subtotal) as totalVendido,
+            SUM((dv.precioUnitario - dv.precioCompraUnitario) * dv.cantidad) as margenTotal
+        FROM detalle_venta dv
+        INNER JOIN ventas v ON v.id = dv.ventaId
+        WHERE v.estado = 'COMPLETADA' AND v.fecha BETWEEN :desde AND :hasta
+        GROUP BY dv.productoId, dv.nombreProducto
+        ORDER BY unidadesVendidas DESC
+        LIMIT :limite
+        """
+    )
+    suspend fun obtenerProductosMasVendidos(desde: Long, hasta: Long, limite: Int = 30): List<ProductoMasVendido>
+
     @Query(
         """
         SELECT COALESCE(SUM((dv.precioUnitario - dv.precioCompraUnitario) * dv.cantidad), 0.0)
@@ -49,3 +68,4 @@ interface DetalleVentaDao {
     )
     suspend fun calcularMargenTotal(desde: Long, hasta: Long): Double
 }
+
