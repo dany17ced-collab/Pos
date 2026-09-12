@@ -45,6 +45,10 @@ interface CorteCajaDao {
     @Query("SELECT * FROM cortes_caja ORDER BY fechaCorte DESC")
     fun observarHistorial(): Flow<List<CorteCajaEntity>>
 
+    /** Igual que observarHistorial, pero de un solo disparo — usada para generar reportes. */
+    @Query("SELECT * FROM cortes_caja WHERE fechaCorte BETWEEN :desde AND :hasta ORDER BY fechaCorte DESC")
+    suspend fun obtenerHistorialEnRango(desde: Long, hasta: Long): List<CorteCajaEntity>
+
     @Query("SELECT * FROM cortes_caja WHERE sincronizado = 0")
     suspend fun obtenerPendientesDeSincronizar(): List<CorteCajaEntity>
 
