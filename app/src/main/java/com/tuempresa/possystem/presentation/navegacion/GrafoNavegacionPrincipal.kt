@@ -27,6 +27,7 @@ import com.tuempresa.possystem.presentation.inventario.PantallaInventario
 import com.tuempresa.possystem.presentation.inventario.PantallaNuevoProducto
 import com.tuempresa.possystem.presentation.inventario.fabricaViewModel
 import com.tuempresa.possystem.presentation.reportes.PantallaReportes
+import com.tuempresa.possystem.presentation.usuarios.PantallaUsuarios
 import com.tuempresa.possystem.presentation.venta.PantallaVenta
 
 private object Rutas {
@@ -39,6 +40,7 @@ private object Rutas {
     const val ENTRADA_MERCADERIA = "entrada_mercaderia"
     const val EDITAR_PRECIO = "editar_precio/{productoId}"
     const val REPORTES = "reportes"
+    const val USUARIOS = "usuarios"
 }
 
 @Composable
@@ -102,6 +104,7 @@ fun GrafoNavegacionPrincipal(app: POSApplication) {
                         "venta" -> navController.navigate(Rutas.VENTA)
                         "inventario" -> navController.navigate(Rutas.INVENTARIO)
                         "reportes" -> navController.navigate(Rutas.REPORTES)
+                        "usuarios" -> navController.navigate(Rutas.USUARIOS)
                         else -> navController.navigate("proximamente/$ruta")
                     }
                 },
@@ -140,6 +143,10 @@ fun GrafoNavegacionPrincipal(app: POSApplication) {
             PantallaReportes(app = app, onVolver = { navController.popBackStack() })
         }
 
+        composable(Rutas.USUARIOS) {
+            PantallaUsuarios(app = app, onVolver = { navController.popBackStack() })
+        }
+
         composable(Rutas.NUEVO_PRODUCTO) {
             PantallaNuevoProducto(
                 app = app,
@@ -176,19 +183,5 @@ private fun tituloParaSeccion(seccion: String): String = when (seccion) {
     "inventario_consulta" -> "Consultar inventario"
     "mis_ventas" -> "Mis ventas de hoy"
     "reportes" -> "Reportes y caja"
-    "usuarios" -> "Usuarios"
     else -> seccion
-}
-
-/** Fábrica simple de ViewModel para inyectar la Application manualmente (sin Hilt/Koin todavía). */
-private fun <T : androidx.lifecycle.ViewModel> fabricaViewModel(
-    app: POSApplication,
-    crear: () -> T
-): androidx.lifecycle.ViewModelProvider.Factory {
-    return object : androidx.lifecycle.ViewModelProvider.Factory {
-        @Suppress("UNCHECKED_CAST")
-        override fun <U : androidx.lifecycle.ViewModel> create(modelClass: Class<U>): U {
-            return crear() as U
-        }
-    }
 }
