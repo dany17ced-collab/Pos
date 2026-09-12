@@ -45,6 +45,10 @@ interface ProductoDao {
     @Query("SELECT * FROM productos WHERE eliminado = 0 AND productoBaseId IS NULL ORDER BY nombre ASC")
     fun observarProductosActivos(): Flow<List<ProductoEntity>>
 
+    /** Igual que observarProductosActivos, pero de un solo disparo — usada para generar reportes. */
+    @Query("SELECT * FROM productos WHERE eliminado = 0 ORDER BY nombre ASC")
+    suspend fun obtenerTodosActivos(): List<ProductoEntity>
+
     @Query("SELECT * FROM productos WHERE productoBaseId = :productoBaseId AND eliminado = 0")
     fun observarVariantes(productoBaseId: String): Flow<List<ProductoEntity>>
 
