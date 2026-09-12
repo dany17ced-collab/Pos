@@ -25,6 +25,7 @@ import com.tuempresa.possystem.presentation.inventario.PantallaEditarPrecio
 import com.tuempresa.possystem.presentation.inventario.PantallaEntradaMercaderia
 import com.tuempresa.possystem.presentation.inventario.PantallaInventario
 import com.tuempresa.possystem.presentation.inventario.PantallaNuevoProducto
+import com.tuempresa.possystem.presentation.inventario.fabricaViewModel
 import com.tuempresa.possystem.presentation.reportes.PantallaReportes
 import com.tuempresa.possystem.presentation.venta.PantallaVenta
 
