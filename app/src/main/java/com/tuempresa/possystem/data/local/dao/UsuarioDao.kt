@@ -1,52 +1,43 @@
 package com.tuempresa.possystem.data.local.dao
 
-import androidx.room.Dao
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
-import androidx.room.Query
-import androidx.room.Update
+import androidx.room.*
 import com.tuempresa.possystem.data.local.entity.RolUsuario
 import com.tuempresa.possystem.data.local.entity.UsuarioEntity
 import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface UsuarioDao {
-
-    @Insert(onConflict = OnConflictStrategy.ABORT)
-    suspend fun insertar(usuario: UsuarioEntity)
-
+    
+    @Query("SELECT * FROM usuarios WHERE activo = 1 ORDER BY nombre")
+    fun obtenerTodosUsuarios(): Flow<List<UsuarioEntity>>
+    
+    @Query("SELECT * FROM usuarios WHERE id = :id")
+    suspend fun obtenerUsuarioPorId(id: Long): UsuarioEntity?
+    
+    @Query("SELECT * FROM usuarios WHERE nombreUsuario = :nombreUsuario AND contrasena = :contrasena AND activo = 1 LIMIT 1")
+    suspend fun autenticarUsuario(nombreUsuario: String, contrasena: String): UsuarioEntity?
+    
+    @Query("SELECT * FROM usuarios WHERE rol = :rol AND activo = 1 ORDER BY nombre")
+    fun obtenerUsuariosPorRol(rol: RolUsuario): Flow<List<UsuarioEntity>>
+    
+    @Query("SELECT COUNT(*) FROM usuarios WHERE activo = 1")
+    fun contarUsuariosActivos(): Flow<Int>
+    
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertarUsuario(usuario: UsuarioEntity): Long
+    
     @Update
-    suspend fun actualizar(usuario: UsuarioEntity)
-
-    @Query("UPDATE usuarios SET activo = 0, sincronizado = 0, actualizadoEn = :ahora WHERE id = :id")
-    suspend fun desactivar(id: String, ahora: Long = System.currentTimeMillis())
-
-    @Query("UPDATE usuarios SET activo = 1, sincronizado = 0, actualizadoEn = :ahora WHERE id = :id")
-    suspend fun reactivar(id: String, ahora: Long = System.currentTimeMillis())
-
-    @Query("SELECT * FROM usuarios WHERE eliminado = 0 ORDER BY rol ASC, nombre ASC")
-    fun observarTodos(): Flow<List<UsuarioEntity>>
-
-    @Query("SELECT * FROM usuarios WHERE eliminado = 0 AND activo = 1 AND rol = :rol ORDER BY nombre ASC")
-    fun observarPorRol(rol: RolUsuario): Flow<List<UsuarioEntity>>
-
-    @Query("SELECT * FROM usuarios WHERE id = :id LIMIT 1")
-    suspend fun obtenerPorId(id: String): UsuarioEntity?
-
-    @Query("SELECT COUNT(*) FROM usuarios WHERE eliminado = 0 AND rol = 'ADMIN' AND activo = 1")
-    suspend fun contarAdminsActivos(): Int
-
-    /**
-     * Trae todos los usuarios activos para intentar el login por PIN.
-     * La verificación del hash se hace en la capa de dominio (PinHasher),
-     * ya que SQLite no puede comparar hashes con sal por usuario en una sola query.
-     */
-    @Query("SELECT * FROM usuarios WHERE eliminado = 0 AND activo = 1")
-    suspend fun obtenerTodosActivos(): List<UsuarioEntity>
-
-    @Query("SELECT * FROM usuarios WHERE sincronizado = 0")
-    suspend fun obtenerPendientesDeSincronizar(): List<UsuarioEntity>
-
-    @Query("UPDATE usuarios SET sincronizado = 1 WHERE id IN (:ids)")
-    suspend fun marcarSincronizados(ids: List<String>)
+    suspend fun actualizarUsuario(usuario: UsuarioEntity)
+    
+    @Delete
+    suspend fun eliminarUsuario(usuario: UsuarioEntity)
+    
+    @Query("UPDATE usuarios SET activo = 0 WHERE id = :id")
+    suspend fun desactivarUsuario(id: Long)
+    
+    @Query("UPDATE usuarios SET ultimoAcceso = :fecha WHERE id = :id")
+    suspend fun actualizarUltimoAcceso(id: Long, fecha: Long = System.currentTimeMillis())
+    
+    @Query("SELECT * FROM usuarios WHERE nombreUsuario = :nombreUsuario LIMIT 1")
+    suspend fun existeNombreUsuario(nombreUsuario: String): UsuarioEntity?
 }
