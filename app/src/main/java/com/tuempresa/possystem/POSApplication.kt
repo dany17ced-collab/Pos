@@ -3,6 +3,7 @@ package com.tuempresa.possystem
 import android.app.Application
 import com.tuempresa.possystem.data.local.AppDatabase
 import com.tuempresa.possystem.data.local.entity.RolUsuario
+import com.tuempresa.possystem.data.local.repository.UsuarioRepository
 import com.tuempresa.possystem.domain.AuthRepository
 import com.tuempresa.possystem.domain.PrecioCalculator
 import com.tuempresa.possystem.domain.SessionManager
@@ -15,6 +16,7 @@ class POSApplication : Application() {
     val database: AppDatabase by lazy { AppDatabase.obtenerInstancia(this) }
 
     val authRepository: AuthRepository by lazy { AuthRepository(database.usuarioDao()) }
+    val usuarioRepository: UsuarioRepository by lazy { UsuarioRepository(database.usuarioDao()) }
     val precioCalculator: PrecioCalculator by lazy { PrecioCalculator(database.precioEscalonDao()) }
     val sessionManager: SessionManager by lazy { SessionManager() }
 
