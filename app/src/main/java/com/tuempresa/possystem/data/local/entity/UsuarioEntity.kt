@@ -4,21 +4,22 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 
 enum class RolUsuario {
-    ADMINISTRADOR,
-    VENDEDOR,
-    SUPERVISOR
+    ADMIN,
+    VENDEDOR
 }
 
 @Entity(tableName = "usuarios")
 data class UsuarioEntity(
-    @PrimaryKey(autoGenerate = true)
-    val id: Long = 0,
-    
+    @PrimaryKey
+    val id: String,
+
     val nombre: String,
-    val nombreUsuario: String,
-    val contrasena: String,  // En producción, debería estar encriptada
+    val pinHash: String,
+    val pinSal: String,
     val rol: RolUsuario,
     val activo: Boolean = true,
-    val fechaCreacion: Long = System.currentTimeMillis(),
-    val ultimoAcceso: Long? = null
+    val creadoEn: Long = System.currentTimeMillis(),
+    val actualizadoEn: Long = System.currentTimeMillis(),
+    val sincronizado: Boolean = false,
+    val eliminado: Boolean = false
 )
