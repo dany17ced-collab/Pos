@@ -24,6 +24,24 @@ interface ProductoDao {
     @Query("UPDATE productos SET eliminado = 1, sincronizado = 0, actualizadoEn = :ahora WHERE id = :id")
     suspend fun marcarEliminado(id: String, ahora: Long = System.currentTimeMillis())
 
+    /**
+     * Actualiza únicamente el precio de venta de un producto/variante — usado
+     * en Inventario para ajustar precios por temporada sin tocar el resto de
+     * los campos (stock, nombre, etc).
+     */
+    @Query(
+        """
+        UPDATE productos 
+        SET precioVenta = :nuevoPrecio, sincronizado = 0, actualizadoEn = :ahora
+        WHERE id = :productoId
+        """
+    )
+    suspend fun actualizarPrecioVenta(
+        productoId: String,
+        nuevoPrecio: Double,
+        ahora: Long = System.currentTimeMillis()
+    )
+
     @Query("SELECT * FROM productos WHERE eliminado = 0 AND productoBaseId IS NULL ORDER BY nombre ASC")
     fun observarProductosActivos(): Flow<List<ProductoEntity>>
 
