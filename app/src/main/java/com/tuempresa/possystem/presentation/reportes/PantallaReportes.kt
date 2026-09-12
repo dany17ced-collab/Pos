@@ -88,6 +88,7 @@ fun PantallaReportes(
                 .verticalScroll(rememberScrollState())
                 .padding(bottom = 32.dp)
         ) {
+            // Header
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -109,11 +110,13 @@ fun PantallaReportes(
                 )
             }
 
+            // Tarjeta de resumen
             TarjetaResumenTurno(
                 resumen = resumenTurno,
                 desde = fechaInicioTurno
             )
 
+            // Botones de corte
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -137,25 +140,30 @@ fun PantallaReportes(
                 }
             }
 
-            if (estadoCorte is EstadoCorte.Exitoso) {
-                val tipo = (estadoCorte as EstadoCorte.Exitoso).tipo
-                val mensaje = if (tipo == TipoCorte.X) "Corte X generado." else "Caja cerrada correctamente."
-                Text(
-                    mensaje,
-                    color = ColorExito,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
-                )
-            }
-            if (estadoCorte is EstadoCorte.Error) {
-                Text(
-                    (estadoCorte as EstadoCorte.Error).mensaje,
-                    color = ColorError,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
-                )
+            // Mensajes de estado
+            when (estadoCorte) {
+                is EstadoCorte.Exitoso -> {
+                    val tipo = (estadoCorte as EstadoCorte.Exitoso).tipo
+                    val mensaje = if (tipo == TipoCorte.X) "Corte X generado." else "Caja cerrada correctamente."
+                    Text(
+                        mensaje,
+                        color = ColorExito,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+                    )
+                }
+                is EstadoCorte.Error -> {
+                    Text(
+                        (estadoCorte as EstadoCorte.Error).mensaje,
+                        color = ColorError,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+                    )
+                }
+                else -> {}
             }
 
+            // Productos más vendidos
             Text(
                 "Productos más vendidos hoy",
                 color = TextoCrema,
@@ -163,6 +171,7 @@ fun PantallaReportes(
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(horizontal = 20.dp, top = 20.dp, bottom = 8.dp)
             )
+            
             if (masVendidos.isEmpty()) {
                 Text(
                     "Aún no hay ventas registradas hoy.",
@@ -208,6 +217,7 @@ fun PantallaReportes(
                 }
             }
 
+            // Historial de cortes
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -250,6 +260,7 @@ fun PantallaReportes(
         }
     }
 
+    // Diálogo de Corte Z
     if (mostrarDialogoCorteZ) {
         DialogoCorteZ(
             resumen = resumenTurno,
@@ -266,7 +277,10 @@ fun PantallaReportes(
 }
 
 @Composable
-private fun TarjetaResumenTurno(resumen: com.tuempresa.possystem.data.local.dao.ResumenVentasCaja?, desde: Long) {
+private fun TarjetaResumenTurno(
+    resumen: com.tuempresa.possystem.data.local.dao.ResumenVentasCaja?, 
+    desde: Long
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -317,7 +331,12 @@ private fun FilaTotal(etiqueta: String, valor: Double) {
             .fillMaxWidth()
             .padding(top = 6.dp)
     ) {
-        Text(etiqueta, color = TextoCremaApagado, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        Text(
+            etiqueta, 
+            color = TextoCremaApagado, 
+            fontSize = 13.sp, 
+            modifier = Modifier.weight(1f)
+        )
         Text("S/ ${"%.2f".format(valor)}", color = TextoCrema, fontSize = 13.sp)
     }
 }
@@ -345,15 +364,29 @@ private fun FilaCorte(corte: CorteCajaEntity) {
                 fontWeight = FontWeight.Bold
             )
         }
-        Column(modifier = Modifier
-            .weight(1f)
-            .padding(start = 12.dp)
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 12.dp)
         ) {
-            Text(formatoFechaHora.format(Date(corte.fechaCorte)), color = TextoCrema, fontSize = 13.sp)
-            Text("${corte.numeroTransacciones} ventas", color = TextoCremaApagado, fontSize = 12.sp)
+            Text(
+                formatoFechaHora.format(Date(corte.fechaCorte)), 
+                color = TextoCrema, 
+                fontSize = 13.sp
+            )
+            Text(
+                "${corte.numeroTransacciones} ventas", 
+                color = TextoCremaApagado, 
+                fontSize = 12.sp
+            )
         }
         Column(horizontalAlignment = Alignment.End) {
-            Text("S/ ${"%.2f".format(corte.totalVentas)}", color = TextoCrema, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Text(
+                "S/ ${"%.2f".format(corte.totalVentas)}", 
+                color = TextoCrema, 
+                fontSize = 14.sp, 
+                fontWeight = FontWeight.Medium
+            )
             if (corte.tipo == TipoCorte.Z && corte.diferencia != null) {
                 val colorDif = if (kotlin.math.abs(corte.diferencia) < 0.01) ColorExito else ColorError
                 val signo = if (corte.diferencia >= 0) "+" else ""
@@ -394,7 +427,11 @@ private fun DialogoCorteZ(
                     fontSize = 13.sp,
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
-                Text("¿Cuánto efectivo hay físicamente en caja?", color = TextoCrema, fontSize = 13.sp)
+                Text(
+                    "¿Cuánto efectivo hay físicamente en caja?", 
+                    color = TextoCrema, 
+                    fontSize = 13.sp
+                )
                 TextField(
                     value = efectivoContadoTexto,
                     onValueChange = { nuevo ->
