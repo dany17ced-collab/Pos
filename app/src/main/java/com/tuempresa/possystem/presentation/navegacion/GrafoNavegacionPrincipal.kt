@@ -8,9 +8,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.navArgument
 import com.tuempresa.possystem.CrashHandler
 import com.tuempresa.possystem.POSApplication
 import com.tuempresa.possystem.data.local.entity.RolUsuario
@@ -19,6 +21,7 @@ import com.tuempresa.possystem.presentation.home.PantallaHomeVendedor
 import com.tuempresa.possystem.presentation.home.PantallaProximamente
 import com.tuempresa.possystem.presentation.login.LoginViewModel
 import com.tuempresa.possystem.presentation.login.PantallaLogin
+import com.tuempresa.possystem.presentation.inventario.PantallaEditarPrecio
 import com.tuempresa.possystem.presentation.inventario.PantallaEntradaMercaderia
 import com.tuempresa.possystem.presentation.inventario.PantallaInventario
 import com.tuempresa.possystem.presentation.inventario.PantallaNuevoProducto
@@ -32,6 +35,7 @@ private object Rutas {
     const val INVENTARIO = "inventario"
     const val NUEVO_PRODUCTO = "nuevo_producto"
     const val ENTRADA_MERCADERIA = "entrada_mercaderia"
+    const val EDITAR_PRECIO = "editar_precio/{productoId}"
 }
 
 @Composable
@@ -110,7 +114,21 @@ fun GrafoNavegacionPrincipal(app: POSApplication) {
                 app = app,
                 onVolver = { navController.popBackStack() },
                 onNuevoProducto = { navController.navigate(Rutas.NUEVO_PRODUCTO) },
-                onEntradaMercaderia = { navController.navigate(Rutas.ENTRADA_MERCADERIA) }
+                onEntradaMercaderia = { navController.navigate(Rutas.ENTRADA_MERCADERIA) },
+                onEditarPrecio = { productoId -> navController.navigate("editar_precio/$productoId") }
+            )
+        }
+
+        composable(
+            Rutas.EDITAR_PRECIO,
+            arguments = listOf(navArgument("productoId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val productoId = backStackEntry.arguments?.getString("productoId") ?: ""
+            PantallaEditarPrecio(
+                app = app,
+                productoId = productoId,
+                onVolver = { navController.popBackStack() },
+                onGuardado = { navController.popBackStack() }
             )
         }
 
