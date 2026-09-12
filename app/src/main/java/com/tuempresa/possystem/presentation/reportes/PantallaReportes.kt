@@ -19,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -36,14 +37,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.content.Intent
 import com.tuempresa.possystem.POSApplication
 import com.tuempresa.possystem.data.local.entity.CorteCajaEntity
 import com.tuempresa.possystem.data.local.entity.TipoCorte
+import com.tuempresa.possystem.domain.reportes.PeriodoReporte
 import com.tuempresa.possystem.presentation.inventario.fabricaSimple
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -71,13 +76,29 @@ fun PantallaReportes(
     val historialCortes by viewModel.historialCortes.collectAsState()
     val masVendidos by viewModel.masVendidosHoy.collectAsState()
     val estadoCorte by viewModel.estadoCorte.collectAsState()
+    val estadoExportacion by viewModel.estadoExportacion.collectAsState()
 
+    val contexto = LocalContext.current
     var mostrarDialogoCorteZ by remember { mutableStateOf(false) }
     var mostrarHistorialCompleto by remember { mutableStateOf(false) }
 
     LaunchedEffect(estadoCorte) {
         if (estadoCorte is EstadoCorte.Exitoso) {
             mostrarDialogoCorteZ = false
+        }
+    }
+
+    LaunchedEffect(estadoExportacion) {
+        val estado = estadoExportacion
+        if (estado is EstadoExportacion.Exitoso) {
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = if (estado.nombreArchivo.endsWith(".pdf")) "application/pdf"
+                else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                putExtra(Intent.EXTRA_STREAM, estado.uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            contexto.startActivity(Intent.createChooser(intent, "Compartir reporte"))
+            viewModel.limpiarEstadoExportacion()
         }
     }
 
@@ -161,6 +182,88 @@ fun PantallaReportes(
                     )
                 }
                 else -> {}
+            }
+
+            // Exportar reportes
+            Text(
+                "Exportar reporte detallado",
+                color = TextoCrema,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(start = 20.dp, top = 12.dp, end = 20.dp, bottom = 4.dp)
+            )
+            Text(
+                "Incluye ventas por día, productos más vendidos, cortes de caja e inventario valorizado.",
+                color = TextoCremaApagado,
+                fontSize = 12.sp,
+                modifier = Modifier.padding(horizontal = 20.dp, bottom = 10.dp)
+            )
+
+            val exportando = estadoExportacion is EstadoExportacion.Generando
+
+            Column(
+                modifier = Modifier.padding(horizontal = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("Últimos 7 días", color = TextoCremaApagado, fontSize = 12.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    BotonExportar(
+                        texto = "Excel",
+                        habilitado = !exportando,
+                        modifier = Modifier.weight(1f)
+                    ) { viewModel.exportarReporte(PeriodoReporte.SEMANAL, FormatoExportacion.EXCEL) }
+                    BotonExportar(
+                        texto = "PDF",
+                        habilitado = !exportando,
+                        modifier = Modifier.weight(1f)
+                    ) { viewModel.exportarReporte(PeriodoReporte.SEMANAL, FormatoExportacion.PDF) }
+                }
+
+                Text(
+                    "Últimos 30 días",
+                    color = TextoCremaApagado,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(top = 6.dp)
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    BotonExportar(
+                        texto = "Excel",
+                        habilitado = !exportando,
+                        modifier = Modifier.weight(1f)
+                    ) { viewModel.exportarReporte(PeriodoReporte.MENSUAL, FormatoExportacion.EXCEL) }
+                    BotonExportar(
+                        texto = "PDF",
+                        habilitado = !exportando,
+                        modifier = Modifier.weight(1f)
+                    ) { viewModel.exportarReporte(PeriodoReporte.MENSUAL, FormatoExportacion.PDF) }
+                }
+
+                if (exportando) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(top = 6.dp)
+                    ) {
+                        CircularProgressIndicator(
+                            color = AcentoTerracota,
+                            modifier = Modifier.width(16.dp).height(16.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Text(
+                            "Generando reporte…",
+                            color = TextoCremaApagado,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
+                    }
+                }
+                if (estadoExportacion is EstadoExportacion.Error) {
+                    Text(
+                        (estadoExportacion as EstadoExportacion.Error).mensaje,
+                        color = ColorError,
+                        fontSize = 12.sp,
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
+                }
             }
 
             // Productos más vendidos
@@ -484,4 +587,20 @@ private fun DialogoCorteZ(
             }
         }
     )
+}
+
+@Composable
+private fun BotonExportar(
+    texto: String,
+    habilitado: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    OutlinedButton(
+        onClick = onClick,
+        enabled = habilitado,
+        modifier = modifier
+    ) {
+        Text(texto, color = if (habilitado) TextoCrema else TextoCremaApagado)
+    }
 }
