@@ -51,3 +51,24 @@ interface CorteCajaDao {
     @Query("UPDATE cortes_caja SET sincronizado = 1 WHERE id IN (:ids)")
     suspend fun marcarSincronizados(ids: List<String>)
 }
+
+@Dao
+interface CorteCajaDao {
+    // ... tus queries existentes ...
+    
+    // ✅ NUEVO: Obtener el último corte (de cualquier tipo)
+    @Query("SELECT * FROM cortes_caja ORDER BY fechaCorte DESC LIMIT 1")
+    suspend fun obtenerUltimoCorte(): CorteCajaEntity?
+    
+    // ✅ NUEVO: Verificar si hay turno abierto (último corte fue X, no hay Z)
+    @Query("SELECT * FROM cortes_caja ORDER BY fechaCorte DESC LIMIT 1")
+    suspend fun obtenerUltimoMovimiento(): CorteCajaEntity?
+    
+    // ✅ NUEVO: Obtener fondo inicial del turno actual
+    @Query("SELECT fondoInicial FROM cortes_caja WHERE tipo = 'X' ORDER BY fechaCorte DESC LIMIT 1")
+    suspend fun obtenerFondoInicialTurnoActual(): Double?
+    
+    // ✅ NUEVO: Insertar apertura de turno (primer corte X con fondo inicial)
+    @Insert
+    suspend fun insertarAperturaTurno(corte: CorteCajaEntity): Long
+}
