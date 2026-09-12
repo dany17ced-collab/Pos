@@ -73,6 +73,12 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "/META-INF/DEPENDENCIES"
+            excludes += "/META-INF/LICENSE"
+            excludes += "/META-INF/LICENSE.txt"
+            excludes += "/META-INF/NOTICE"
+            excludes += "/META-INF/NOTICE.txt"
+            excludes += "/META-INF/*.kotlin_module"
         }
     }
 }
@@ -121,8 +127,15 @@ dependencies {
     // ---------- Permisos en Compose ----------
     implementation("com.google.accompanist:accompanist-permissions:0.34.0")
 
-    // ---------- Generación de PDF (comprobantes) ----------
+    // ---------- Generación de PDF (comprobantes y reportes) ----------
     implementation("com.itextpdf:itext7-core:8.0.5")
+
+    // Nota: los reportes en Excel (.xlsx) se generan a mano en
+    // domain/reportes/ExportadorExcel.kt escribiendo directamente el formato
+    // OOXML (zip + XML) con java.util.zip, sin Apache POI. POI depende de
+    // java.awt y de varios jars nativos de escritorio que no existen en
+    // Android y causan errores de compilación/runtime difíciles de resolver
+    // de forma confiable (ver https://github.com/centic9/poi-on-android).
 
     // ---------- Coil (carga de imágenes de productos) ----------
     implementation("io.coil-kt:coil-compose:2.6.0")
