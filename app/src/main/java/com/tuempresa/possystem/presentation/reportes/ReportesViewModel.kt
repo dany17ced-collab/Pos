@@ -1,5 +1,7 @@
 package com.tuempresa.possystem.presentation.reportes
 
+import android.net.Uri
+import androidx.core.content.FileProvider
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tuempresa.possystem.POSApplication
@@ -7,6 +9,11 @@ import com.tuempresa.possystem.data.local.dao.ProductoMasVendido
 import com.tuempresa.possystem.data.local.dao.ResumenVentasCaja
 import com.tuempresa.possystem.data.local.entity.CorteCajaEntity
 import com.tuempresa.possystem.data.local.entity.TipoCorte
+import com.tuempresa.possystem.domain.reportes.ExportadorExcel
+import com.tuempresa.possystem.domain.reportes.ExportadorPdf
+import com.tuempresa.possystem.domain.reportes.GeneradorDatosReporte
+import com.tuempresa.possystem.domain.reportes.PeriodoReporte
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -14,10 +21,16 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Locale
 import java.util.UUID
 
 /** Identifica el dispositivo/caja actual — igual que en VentaViewModel, sin soporte multi-caja aún. */
 private const val CAJA_ID = "caja-principal"
+
+enum class FormatoExportacion { EXCEL, PDF }
 
 sealed class EstadoCorte {
     object Inactivo : EstadoCorte()
@@ -26,17 +39,28 @@ sealed class EstadoCorte {
     data class Error(val mensaje: String) : EstadoCorte()
 }
 
+sealed class EstadoExportacion {
+    object Inactivo : EstadoExportacion()
+    object Generando : EstadoExportacion()
+    data class Exitoso(val uri: Uri, val nombreArchivo: String) : EstadoExportacion()
+    data class Error(val mensaje: String) : EstadoExportacion()
+}
+
 /**
  * Junta el resumen de ventas del turno abierto (desde el último corte Z, o desde
  * siempre si nunca se ha hecho uno), el historial de cortes y los productos más
  * vendidos, para la pantalla de Reportes y Caja.
  */
-class ReportesViewModel(app: POSApplication) : ViewModel() {
+class ReportesViewModel(private val app: POSApplication) : ViewModel() {
 
     private val corteCajaDao = app.database.corteCajaDao()
     private val ventaDao = app.database.ventaDao()
     private val detalleVentaDao = app.database.detalleVentaDao()
     private val sessionManager = app.sessionManager
+    private val generadorReporte = GeneradorDatosReporte(app)
+
+    private val _estadoExportacion = MutableStateFlow<EstadoExportacion>(EstadoExportacion.Inactivo)
+    val estadoExportacion: StateFlow<EstadoExportacion> = _estadoExportacion.asStateFlow()
 
     private val _resumenTurno = MutableStateFlow<ResumenVentasCaja?>(null)
     val resumenTurno: StateFlow<ResumenVentasCaja?> = _resumenTurno.asStateFlow()
@@ -179,5 +203,49 @@ class ReportesViewModel(app: POSApplication) : ViewModel() {
 
     fun limpiarEstadoCorte() {
         _estadoCorte.value = EstadoCorte.Inactivo
+    }
+
+    /**
+     * Genera el reporte detallado (semanal o mensual) en el formato pedido y lo
+     * deja en cacheDir/reportes, listo para compartir/abrir con un Uri de
+     * FileProvider (nunca se expone una ruta file:// directa).
+     */
+    fun exportarReporte(periodo: PeriodoReporte, formato: FormatoExportacion) {
+        viewModelScope.launch {
+            _estadoExportacion.value = EstadoExportacion.Generando
+            try {
+                val datos = withContext(Dispatchers.IO) { generadorReporte.generar(periodo) }
+
+                val carpeta = File(app.cacheDir, "reportes").apply { mkdirs() }
+                val marcaTiempo = SimpleDateFormat("yyyyMMdd_HHmm", Locale.getDefault()).format(java.util.Date())
+                val prefijoPeriodo = if (periodo == PeriodoReporte.SEMANAL) "semanal" else "mensual"
+                val extension = if (formato == FormatoExportacion.EXCEL) "xlsx" else "pdf"
+                val nombreArchivo = "reporte_${prefijoPeriodo}_$marcaTiempo.$extension"
+                val archivo = File(carpeta, nombreArchivo)
+
+                withContext(Dispatchers.IO) {
+                    when (formato) {
+                        FormatoExportacion.EXCEL -> ExportadorExcel.exportar(datos, archivo)
+                        FormatoExportacion.PDF -> ExportadorPdf.exportar(datos, archivo)
+                    }
+                }
+
+                val uri = FileProvider.getUriForFile(
+                    app,
+                    "${app.packageName}.fileprovider",
+                    archivo
+                )
+
+                _estadoExportacion.value = EstadoExportacion.Exitoso(uri, nombreArchivo)
+            } catch (ex: Exception) {
+                _estadoExportacion.value = EstadoExportacion.Error(
+                    ex.message ?: "No se pudo generar el reporte."
+                )
+            }
+        }
+    }
+
+    fun limpiarEstadoExportacion() {
+        _estadoExportacion.value = EstadoExportacion.Inactivo
     }
 }
