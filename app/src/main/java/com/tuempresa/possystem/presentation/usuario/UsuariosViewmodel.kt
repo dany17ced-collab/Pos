@@ -1,11 +1,17 @@
 package com.tuempresa.possystem.presentation.usuarios
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.tuempresa.possystem.data.local.entity.RolUsuario
 import com.tuempresa.possystem.data.local.entity.UsuarioEntity
-import com.tuempresa.possystem.data.repository.UsuarioRepository
-import kotlinx.coroutines.flow.*
+import com.tuempresa.possystem.data.local.repository.UsuarioRepository
+import com.tuempresa.possystem.domain.AuthRepository
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 
 sealed class EstadoUsuarios {
@@ -21,29 +27,37 @@ sealed class EstadoOperacionUsuario {
     data class Error(val mensaje: String) : EstadoOperacionUsuario()
 }
 
+/**
+ * repository se usa para listar/buscar/filtrar/desactivar usuarios.
+ * authRepository se usa para crear usuarios y cambiar PIN, ya que es el único
+ * que conoce el hasheo (PinHasher) — ver domain/AuthRepository.kt.
+ */
 class UsuariosViewModel(
-    private val repository: UsuarioRepository
+    private val repository: UsuarioRepository,
+    private val authRepository: AuthRepository
 ) : ViewModel() {
-    
+
     private val _estadoUsuarios = MutableStateFlow<EstadoUsuarios>(EstadoUsuarios.Cargando)
     val estadoUsuarios: StateFlow<EstadoUsuarios> = _estadoUsuarios
-    
-    private val _estadoOperacion = MutableStateFlow(EstadoOperacionUsuario.Idle)
+
+    private val _estadoOperacion = MutableStateFlow<EstadoOperacionUsuario>(EstadoOperacionUsuario.Idle)
     val estadoOperacion: StateFlow<EstadoOperacionUsuario> = _estadoOperacion
-    
+
     private val _usuariosFiltrados = MutableStateFlow<List<UsuarioEntity>>(emptyList())
     val usuariosFiltrados: StateFlow<List<UsuarioEntity>> = _usuariosFiltrados
-    
+
     var textoBusqueda by mutableStateOf("")
         private set
-    
+
     var rolFiltro by mutableStateOf<RolUsuario?>(null)
         private set
-    
+
+    private var ultimaListaUsuarios: List<UsuarioEntity> = emptyList()
+
     init {
         cargarUsuarios()
     }
-    
+
     private fun cargarUsuarios() {
         viewModelScope.launch {
             repository.todosUsuarios
@@ -51,108 +65,80 @@ class UsuariosViewModel(
                     _estadoUsuarios.value = EstadoUsuarios.Error("Error al cargar usuarios: ${e.message}")
                 }
                 .collect { usuarios ->
+                    ultimaListaUsuarios = usuarios
                     _estadoUsuarios.value = EstadoUsuarios.Exitoso(usuarios)
                     aplicarFiltros(usuarios)
                 }
         }
     }
-    
+
     fun buscarUsuarios(texto: String) {
         textoBusqueda = texto
-        aplicarFiltrosActuales()
+        aplicarFiltros(ultimaListaUsuarios)
     }
-    
+
     fun filtrarPorRol(rol: RolUsuario?) {
         rolFiltro = rol
-        aplicarFiltrosActuales()
+        aplicarFiltros(ultimaListaUsuarios)
     }
-    
-    private fun aplicarFiltrosActuales() {
-        val estadoActual = _estadoUsuarios.value
-        if (estadoActual is EstadoUsuarios.Exitoso) {
-            aplicarFiltros(estadoActual.usuarios)
-        }
-    }
-    
+
     private fun aplicarFiltros(usuarios: List<UsuarioEntity>) {
         var resultado = usuarios
-        
-        // Filtrar por texto de búsqueda
+
         if (textoBusqueda.isNotEmpty()) {
             resultado = resultado.filter {
-                it.nombre.contains(textoBusqueda, ignoreCase = true) ||
-                it.nombreUsuario.contains(textoBusqueda, ignoreCase = true)
+                it.nombre.contains(textoBusqueda, ignoreCase = true)
             }
         }
-        
-        // Filtrar por rol
+
         if (rolFiltro != null) {
             resultado = resultado.filter { it.rol == rolFiltro }
         }
-        
+
         _usuariosFiltrados.value = resultado
     }
-    
+
+    /** Crea un usuario nuevo con PIN, o edita nombre/rol de uno existente. */
     fun guardarUsuario(
-        id: Long = 0,
+        usuarioExistente: UsuarioEntity?,
         nombre: String,
-        nombreUsuario: String,
-        contrasena: String,
-        rol: RolUsuario,
-        contrasenaActual: String? = null
+        pin: String,
+        rol: RolUsuario
     ) {
         viewModelScope.launch {
             _estadoOperacion.value = EstadoOperacionUsuario.Procesando
-            
             try {
-                // Validar que el nombre de usuario no exista (excepto para el mismo usuario)
-                if (id == 0L || repository.obtenerUsuarioPorId(id)?.nombreUsuario != nombreUsuario) {
-                    if (repository.existeNombreUsuario(nombreUsuario)) {
-                        _estadoOperacion.value = EstadoOperacionUsuario.Error(
-                            "El nombre de usuario ya está en uso"
-                        )
+                if (usuarioExistente == null) {
+                    if (pin.isBlank()) {
+                        _estadoOperacion.value = EstadoOperacionUsuario.Error("El PIN es obligatorio")
                         return@launch
                     }
-                }
-                
-                val usuario = if (id > 0) {
-                    // Actualizar usuario existente
-                    val existente = repository.obtenerUsuarioPorId(id)
-                        ?: throw Exception("Usuario no encontrado")
-                    
-                    existente.copy(
-                        nombre = nombre,
-                        nombreUsuario = nombreUsuario,
-                        contrasena = if (contrasena.isNotEmpty()) contrasena else existente.contrasena,
-                        rol = rol
-                    )
+                    authRepository.crearUsuario(nombre = nombre, pin = pin, rol = rol)
                 } else {
-                    // Crear nuevo usuario
-                    UsuarioEntity(
-                        nombre = nombre,
-                        nombreUsuario = nombreUsuario,
-                        contrasena = contrasena,
-                        rol = rol
+                    if (pin.isNotBlank()) {
+                        authRepository.cambiarPin(usuarioExistente, pin)
+                    }
+                    repository.actualizarUsuario(
+                        usuarioExistente.copy(nombre = nombre, rol = rol)
                     )
                 }
-                
-                if (id > 0) {
-                    repository.actualizarUsuario(usuario)
-                } else {
-                    repository.insertarUsuario(usuario)
-                }
-                
                 _estadoOperacion.value = EstadoOperacionUsuario.Exitoso
             } catch (e: Exception) {
                 _estadoOperacion.value = EstadoOperacionUsuario.Error(e.message ?: "Error al guardar")
             }
         }
     }
-    
+
     fun eliminarUsuario(usuario: UsuarioEntity) {
         viewModelScope.launch {
             _estadoOperacion.value = EstadoOperacionUsuario.Procesando
             try {
+                if (!authRepository.puedeDesactivarse(usuario)) {
+                    _estadoOperacion.value = EstadoOperacionUsuario.Error(
+                        "No puedes desactivar al último administrador activo"
+                    )
+                    return@launch
+                }
                 repository.desactivarUsuario(usuario.id)
                 _estadoOperacion.value = EstadoOperacionUsuario.Exitoso
             } catch (e: Exception) {
@@ -160,13 +146,7 @@ class UsuariosViewModel(
             }
         }
     }
-    
-    fun actualizarUltimoAcceso(usuarioId: Long) {
-        viewModelScope.launch {
-            repository.actualizarUltimoAcceso(usuarioId)
-        }
-    }
-    
+
     fun limpiarEstadoOperacion() {
         _estadoOperacion.value = EstadoOperacionUsuario.Idle
     }
