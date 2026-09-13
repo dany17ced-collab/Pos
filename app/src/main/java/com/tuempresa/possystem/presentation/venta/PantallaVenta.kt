@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -514,10 +515,16 @@ private fun SelectorVarianteIndividual(
 }
 
 /**
-  * Modo mayorista: el vendedor elige una o varias tallas; por cada talla elegida
+ * Modo mayorista: el vendedor elige una o varias tallas; por cada talla elegida
  * se despliegan todos los colores disponibles en esa talla, cada uno con su
  * propio campo de cantidad (0 = no se agrega) y precio editable. Al confirmar,
  * todas las líneas con cantidad > 0 se agregan al carrito de una sola vez.
+/**
+ * Modo mayorista: el vendedor elige una o varias tallas; por cada talla elegida
+ * primero elige QUÉ colores participan en esa talla para este pedido (no todos
+ * los colores cargados aplican siempre), y recién ahí aparece una fila de
+ * cantidad/precio por cada color elegido. Al confirmar, todas las líneas con
+ * cantidad > 0 se agregan al carrito de una sola vez.
  */
 @Composable
 private fun SelectorMayorista(
@@ -529,6 +536,9 @@ private fun SelectorMayorista(
     val tallasDisponibles = variantes.mapNotNull { it.talla }.distinct()
         .sortedBy { it.toIntOrNull() ?: Int.MAX_VALUE }
     var tallasSeleccionadas by remember { mutableStateOf(setOf<String>()) }
+
+    // Colores elegidos para participar, por talla: clave = talla, valor = set de colores.
+    var coloresPorTalla by remember { mutableStateOf(mapOf<String, Set<String>>()) }
 
     // input de cada variante: clave = variante.id
     var cantidades by remember { mutableStateOf(mapOf<String, String>()) }
@@ -561,17 +571,80 @@ private fun SelectorMayorista(
             }
         }
 
-        if (tallasSeleccionadas.isNotEmpty()) {
-            Column(modifier = Modifier.padding(top = 18.dp)) {
-                tallasSeleccionadas.sortedBy { it.toIntOrNull() ?: Int.MAX_VALUE }.forEach { talla ->
-                    Text(
-                        "Talla $talla",
-                        color = TextoCrema,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)
+        val lineasParaAgregar = tallasSeleccionadas
+            .sortedBy { it.toIntOrNull() ?: Int.MAX_VALUE }
+            .flatMap { talla -> variantes.filter { it.talla == talla } }
+            .mapNotNull { variante ->
+                val cantidad = cantidades[variante.id]?.toIntOrNull() ?: 0
+                val precio = precios[variante.id]?.toDoubleOrNull()
+                if (cantidad > 0 && precio != null) {
+                    VentaViewModel.LineaPendiente(
+                        variante = variante,
+                        cantidad = cantidad,
+                        precioUnitario = precio,
+                        etiquetaEscalon = etiquetas[variante.id] ?: "Unidad"
                     )
-                    variantes.filter { it.talla == talla }.forEach { variante ->
+                } else null
+            }
+
+        if (tallasSeleccionadas.isNotEmpty()) {
+            // Altura acotada con scroll propio: si hay varias tallas con varios
+            // colores cada una, la lista completa no cabría en pantalla junto
+            // con el carrito de abajo.
+            LazyColumn(
+                modifier = Modifier
+                    .padding(top = 16.dp)
+                    .heightIn(max = 340.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                tallasSeleccionadas.sortedBy { it.toIntOrNull() ?: Int.MAX_VALUE }.forEach { talla ->
+                    val coloresDeLaTalla = variantes.filter { it.talla == talla }.mapNotNull { it.color }.distinct()
+                    val coloresElegidos = coloresPorTalla[talla] ?: emptySet()
+
+                    item(key = "encabezado_$talla") {
+                        Text(
+                            "Talla $talla",
+                            color = TextoCrema,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)
+                        )
+                    }
+
+                    item(key = "colores_$talla") {
+                        Column {
+                            Text(
+                                "¿Qué colores lleva en esta talla?",
+                                color = TextoCremaApagado,
+                                fontSize = 12.sp
+                            )
+                            FlowRow(
+                                modifier = Modifier.padding(top = 6.dp, bottom = 8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                coloresDeLaTalla.forEach { color ->
+                                    val variante = variantes.find { it.talla == talla && it.color == color }
+                                    val sinStock = (variante?.stockActual ?: 0) <= 0
+                                    ChipSeleccionable(
+                                        texto = color,
+                                        seleccionado = coloresElegidos.contains(color),
+                                        habilitado = !sinStock,
+                                        onClick = {
+                                            val actuales = coloresPorTalla[talla] ?: emptySet()
+                                            coloresPorTalla = coloresPorTalla + (talla to
+                                                if (actuales.contains(color)) actuales - color else actuales + color)
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    items(
+                        variantes.filter { it.talla == talla && coloresElegidos.contains(it.color) },
+                        key = { it.id }
+                    ) { variante ->
                         FilaVarianteMayorista(
                             variante = variante,
                             cantidadTexto = cantidades[variante.id] ?: "",
@@ -594,21 +667,6 @@ private fun SelectorMayorista(
                     }
                 }
             }
-
-            val lineasParaAgregar = tallasSeleccionadas
-                .flatMap { talla -> variantes.filter { it.talla == talla } }
-                .mapNotNull { variante ->
-                    val cantidad = cantidades[variante.id]?.toIntOrNull() ?: 0
-                    val precio = precios[variante.id]?.toDoubleOrNull()
-                    if (cantidad > 0 && precio != null) {
-                        VentaViewModel.LineaPendiente(
-                            variante = variante,
-                            cantidad = cantidad,
-                            precioUnitario = precio,
-                            etiquetaEscalon = etiquetas[variante.id] ?: "Unidad"
-                        )
-                    } else null
-                }
 
             val totalUnidades = lineasParaAgregar.sumOf { it.cantidad }
             val totalMonto = lineasParaAgregar.sumOf { it.cantidad * it.precioUnitario }
@@ -658,51 +716,64 @@ private fun FilaVarianteMayorista(
     onPrecioChange: (String) -> Unit
 ) {
     val sinStock = variante.stockActual <= 0
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 4.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(FondoCarbon)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(horizontal = 12.dp, vertical = 10.dp)
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = variante.color ?: "Sin color",
-                color = if (sinStock) TextoCremaApagado else TextoCrema,
-                fontSize = 13.sp
+        Text(
+            text = variante.color ?: "Sin color",
+            color = if (sinStock) TextoCremaApagado else TextoCrema,
+            fontSize = 13.sp
+        )
+        Text(
+            text = if (sinStock) "Agotado" else "Stock: ${variante.stockActual} · $etiquetaEscalon",
+            color = TextoCremaApagado,
+            fontSize = 11.sp,
+            modifier = Modifier.padding(bottom = 6.dp)
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Cant.", color = TextoCremaApagado, fontSize = 12.sp)
+            TextField(
+                value = cantidadTexto,
+                onValueChange = { nuevo -> if (nuevo.all { it.isDigit() }) onCantidadChange(nuevo) },
+                enabled = !sinStock,
+                placeholder = { Text("0", color = TextoCremaApagado) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp),
+                modifier = Modifier
+                    .padding(start = 8.dp)
+                    .weight(1f)
+                    .height(56.dp),
+                colors = camposTextoColores(),
+                shape = RoundedCornerShape(8.dp)
             )
             Text(
-                text = if (sinStock) "Agotado" else "Stock: ${variante.stockActual} · $etiquetaEscalon",
+                "S/",
                 color = TextoCremaApagado,
-                fontSize = 11.sp
+                fontSize = 12.sp,
+                modifier = Modifier.padding(start = 12.dp)
+            )
+            TextField(
+                value = precioTexto,
+                onValueChange = { nuevo -> if (nuevo.all { it.isDigit() || it == '.' }) onPrecioChange(nuevo) },
+                enabled = !sinStock,
+                placeholder = { Text("0.00", color = TextoCremaApagado) },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp),
+                modifier = Modifier
+                    .padding(start = 8.dp)
+                    .weight(1f)
+                    .height(56.dp),
+                colors = camposTextoColores(),
+                shape = RoundedCornerShape(8.dp)
             )
         }
-        TextField(
-            value = cantidadTexto,
-            onValueChange = { nuevo -> if (nuevo.all { it.isDigit() }) onCantidadChange(nuevo) },
-            enabled = !sinStock,
-            placeholder = { Text("0", color = TextoCremaApagado) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            modifier = Modifier.size(width = 64.dp, height = 48.dp),
-            colors = camposTextoColores(),
-            shape = RoundedCornerShape(8.dp)
-        )
-        TextField(
-            value = precioTexto,
-            onValueChange = { nuevo -> if (nuevo.all { it.isDigit() || it == '.' }) onPrecioChange(nuevo) },
-            enabled = !sinStock,
-            placeholder = { Text("S/", color = TextoCremaApagado) },
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-            modifier = Modifier
-                .padding(start = 8.dp)
-                .size(width = 76.dp, height = 48.dp),
-            colors = camposTextoColores(),
-            shape = RoundedCornerShape(8.dp)
-        )
     }
 }
 
