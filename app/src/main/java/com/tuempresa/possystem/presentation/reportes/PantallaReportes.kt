@@ -196,7 +196,7 @@ fun PantallaReportes(
                 "Incluye ventas por día, productos más vendidos, cortes de caja e inventario valorizado.",
                 color = TextoCremaApagado,
                 fontSize = 12.sp,
-                modifier = Modifier.padding(horizontal = 20.dp, bottom = 10.dp)
+                modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 10.dp)
             )
 
             val exportando = estadoExportacion is EstadoExportacion.Generando
