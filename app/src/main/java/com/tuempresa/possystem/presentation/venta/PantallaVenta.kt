@@ -134,28 +134,28 @@ fun PantallaVenta(app: POSApplication, onVolver: () -> Unit) {
 
             else -> {
                 Column(modifier = Modifier.fillMaxSize()) {
+                    EncabezadoVenta(onVolver = onVolver)
+
+                    BarraBusqueda(
+                        texto = textoBusqueda,
+                        onTextoCambiado = {
+                            textoBusqueda = it
+                            viewModel.buscarPorTexto(it)
+                        },
+                        onEscanear = {
+                            if (tienePermisoCamara(context)) {
+                                mostrandoEscaner = true
+                            } else {
+                                lanzadorPermiso.launch(Manifest.permission.CAMERA)
+                            }
+                        }
+                    )
+
                     Column(
                         modifier = Modifier
                             .weight(1f)
                             .verticalScroll(rememberScrollState())
                     ) {
-                        EncabezadoVenta(onVolver = onVolver)
-
-                        BarraBusqueda(
-                            texto = textoBusqueda,
-                            onTextoCambiado = {
-                                textoBusqueda = it
-                                viewModel.buscarPorTexto(it)
-                            },
-                            onEscanear = {
-                                if (tienePermisoCamara(context)) {
-                                    mostrandoEscaner = true
-                                } else {
-                                    lanzadorPermiso.launch(Manifest.permission.CAMERA)
-                                }
-                            }
-                        )
-
                         when (val resultado = resultadoBusqueda) {
                             is ResultadoBusqueda.VariosResultados -> {
                                 ListaCoincidencias(
@@ -199,16 +199,12 @@ fun PantallaVenta(app: POSApplication, onVolver: () -> Unit) {
                             }
                             is ResultadoBusqueda.SinBuscar -> Unit
                         }
-
-                        // El carrito ya no va aquí: se muestra fijo debajo de este
-                        // bloque scrolleable para que el vendedor nunca pierda de
-                        // vista el total mientras arma un pedido largo (mayorista).
                     }
 
                     CarritoLista(
                         lineas = carrito,
                         onQuitar = { viewModel.quitarDelCarrito(it) },
-                        modifier = Modifier.heightIn(max = 180.dp)
+                        modifier = Modifier.heightIn(max = 140.dp)
                     )
 
                     PieCarrito(
@@ -502,7 +498,32 @@ private fun SelectorVarianteIndividual(
                         onClick = { varianteSeleccionada = variante }
                     )
                 }
- /**
+            }
+        }
+    }
+
+    varianteSeleccionada?.let { variante ->
+        FilaCantidadYPrecio(
+            cantidadTexto = cantidadTexto,
+            onCantidadChange = { cantidadTexto = it },
+            precioTexto = precioTexto,
+            onPrecioChange = { precioTexto = it },
+            etiquetaEscalon = etiquetaEscalon,
+            stock = variante.stockActual
+        )
+
+        BotonesCancelarAgregar(
+            onCancelar = onCancelar,
+            onAgregar = {
+                val cantidad = cantidadTexto.toIntOrNull() ?: 1
+                val precio = precioTexto.toDoubleOrNull() ?: 0.0
+                onAgregar(variante, cantidad, precio, etiquetaEscalon)
+            }
+        )
+    }
+}
+
+/**
  * Modo mayorista: el vendedor elige una o varias tallas; por cada talla elegida
  * primero elige QUÉ colores participan en esa talla para este pedido (no todos
  * los colores cargados aplican siempre), y recién ahí aparece una fila de
