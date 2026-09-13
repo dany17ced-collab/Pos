@@ -161,6 +161,24 @@ class VentaViewModel(private val app: POSApplication) : ViewModel() {
         _carrito.value = _carrito.value.filterNot { it.id == lineaId }
     }
 
+    /**
+     * Agrega varias variantes al carrito de una sola vez (pedido mayorista:
+     * varias tallas/colores en una sola pasada). Cada línea trae su propia
+     * cantidad, precio y etiqueta de escalón, ya resueltos por la UI.
+     */
+    fun agregarVariasAlCarrito(lineas: List<LineaPendiente>) {
+        lineas.forEach { linea ->
+            agregarAlCarrito(linea.variante, linea.cantidad, linea.precioUnitario, linea.etiquetaEscalon)
+        }
+    }
+
+    data class LineaPendiente(
+        val variante: ProductoEntity,
+        val cantidad: Int,
+        val precioUnitario: Double,
+        val etiquetaEscalon: String
+    )
+
     fun vaciarCarrito() {
         _carrito.value = emptyList()
     }
