@@ -177,6 +177,16 @@ abstract class VentaDao {
     @Query("SELECT * FROM ventas WHERE fecha BETWEEN :desde AND :hasta ORDER BY fecha DESC")
     abstract fun observarVentasEnRango(desde: Long, hasta: Long): Flow<List<VentaEntity>>
 
+    /** Ventas de un usuario específico en un rango de fechas — usada en "Mis ventas de hoy". */
+    @Query(
+        """
+        SELECT * FROM ventas 
+        WHERE usuarioId = :usuarioId AND fecha BETWEEN :desde AND :hasta 
+        ORDER BY fecha DESC
+        """
+    )
+    abstract fun observarVentasDeUsuarioEnRango(usuarioId: String, desde: Long, hasta: Long): Flow<List<VentaEntity>>
+
     /** Igual que observarVentasEnRango, pero de un solo disparo — usada para generar reportes. */
     @Query("SELECT * FROM ventas WHERE fecha BETWEEN :desde AND :hasta ORDER BY fecha DESC")
     abstract suspend fun obtenerVentasEnRango(desde: Long, hasta: Long): List<VentaEntity>
