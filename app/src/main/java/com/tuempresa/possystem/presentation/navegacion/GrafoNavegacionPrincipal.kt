@@ -24,10 +24,12 @@ import com.tuempresa.possystem.presentation.login.PantallaLogin
 import com.tuempresa.possystem.presentation.inventario.PantallaEditarPrecio
 import com.tuempresa.possystem.presentation.inventario.PantallaEntradaMercaderia
 import com.tuempresa.possystem.presentation.inventario.PantallaInventario
+import com.tuempresa.possystem.presentation.inventario.PantallaInventarioConsulta
 import com.tuempresa.possystem.presentation.inventario.PantallaNuevoProducto
 import com.tuempresa.possystem.presentation.inventario.fabricaViewModel
 import com.tuempresa.possystem.presentation.reportes.PantallaReportes
 import com.tuempresa.possystem.presentation.usuarios.PantallaUsuarios
+import com.tuempresa.possystem.presentation.venta.PantallaMisVentas
 import com.tuempresa.possystem.presentation.venta.PantallaVenta
 
 private object Rutas {
@@ -41,6 +43,8 @@ private object Rutas {
     const val EDITAR_PRECIO = "editar_precio/{productoId}"
     const val REPORTES = "reportes"
     const val USUARIOS = "usuarios"
+    const val INVENTARIO_CONSULTA = "inventario_consulta"
+    const val MIS_VENTAS = "mis_ventas"
 }
 
 @Composable
@@ -89,6 +93,8 @@ fun GrafoNavegacionPrincipal(app: POSApplication) {
                 onNavegar = { ruta ->
                     when (ruta) {
                         "venta" -> navController.navigate(Rutas.VENTA)
+                        "inventario_consulta" -> navController.navigate(Rutas.INVENTARIO_CONSULTA)
+                        "mis_ventas" -> navController.navigate(Rutas.MIS_VENTAS)
                         else -> navController.navigate("proximamente/$ruta")
                     }
                 },
@@ -145,6 +151,14 @@ fun GrafoNavegacionPrincipal(app: POSApplication) {
 
         composable(Rutas.USUARIOS) {
             PantallaUsuarios(app = app, onVolver = { navController.popBackStack() })
+        }
+
+        composable(Rutas.INVENTARIO_CONSULTA) {
+            PantallaInventarioConsulta(app = app, onVolver = { navController.popBackStack() })
+        }
+
+        composable(Rutas.MIS_VENTAS) {
+            PantallaMisVentas(app = app, onVolver = { navController.popBackStack() })
         }
 
         composable(Rutas.NUEVO_PRODUCTO) {
