@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.tuempresa.possystem.presentation.venta
 
 import android.Manifest
@@ -26,6 +28,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
@@ -35,6 +39,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,6 +54,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tuempresa.possystem.POSApplication
 import com.tuempresa.possystem.data.local.entity.MetodoPago
 import com.tuempresa.possystem.data.local.entity.ProductoEntity
+import kotlinx.coroutines.launch
 
 // Misma paleta cálida tipo boutique usada en Login y Home
 private val FondoCarbon = Color(0xFF221B1D)
@@ -154,6 +160,10 @@ fun PantallaVenta(app: POSApplication, onVolver: () -> Unit) {
                                 variantes = resultado.variantes,
                                 onAgregar = { variante, cantidad, precio, etiqueta ->
                                     viewModel.agregarAlCarrito(variante, cantidad, precio, etiqueta)
+                                    textoBusqueda = ""
+                                },
+                                onAgregarVarias = { lineas ->
+                                    viewModel.agregarVariasAlCarrito(lineas)
                                     textoBusqueda = ""
                                 },
                                 onCancelar = {
@@ -308,17 +318,75 @@ private fun SelectorVariante(
     viewModel: VentaViewModel,
     variantes: List<ProductoEntity>,
     onAgregar: (ProductoEntity, Int, Double, String) -> Unit,
+    onAgregarVarias: (List<VentaViewModel.LineaPendiente>) -> Unit,
     onCancelar: () -> Unit
 ) {
-    var varianteSeleccionada by remember { mutableStateOf<ProductoEntity?>(null) }
+    // Producto simple, sin talla/color: se mantiene el flujo directo de siempre.
+    if (variantes.size == 1 && variantes.first().talla == null && variantes.first().color == null) {
+        SelectorVarianteUnica(
+            viewModel = viewModel,
+            variante = variantes.first(),
+            onAgregar = onAgregar,
+            onCancelar = onCancelar
+        )
+        return
+    }
+
+    var modoMayorista by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(FondoTarjeta)
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "Modo mayorista (varias tallas/colores)",
+                color = TextoCrema,
+                fontSize = 13.sp,
+                modifier = Modifier.weight(1f)
+            )
+            Switch(
+                checked = modoMayorista,
+                onCheckedChange = { modoMayorista = it },
+                colors = SwitchDefaults.colors(checkedTrackColor = AcentoTerracota)
+            )
+        }
+
+        if (modoMayorista) {
+            SelectorMayorista(
+                viewModel = viewModel,
+                variantes = variantes,
+                onAgregarVarias = onAgregarVarias,
+                onCancelar = onCancelar
+            )
+        } else {
+            SelectorVarianteIndividual(
+                viewModel = viewModel,
+                variantes = variantes,
+                onAgregar = onAgregar,
+                onCancelar = onCancelar
+            )
+        }
+    }
+}
+
+/** Flujo original: un producto simple sin talla ni color, directo a cantidad/precio. */
+@Composable
+private fun SelectorVarianteUnica(
+    viewModel: VentaViewModel,
+    variante: ProductoEntity,
+    onAgregar: (ProductoEntity, Int, Double, String) -> Unit,
+    onCancelar: () -> Unit
+) {
     var cantidadTexto by remember { mutableStateOf("1") }
     var precioTexto by remember { mutableStateOf("") }
     var etiquetaEscalon by remember { mutableStateOf("Unidad") }
 
-    // Cada vez que cambia la variante elegida o la cantidad escrita, se recalcula
-    // el precio SUGERIDO por escalón; el vendedor puede sobrescribirlo a mano después.
-    LaunchedEffect(varianteSeleccionada, cantidadTexto) {
-        val variante = varianteSeleccionada ?: return@LaunchedEffect
+    LaunchedEffect(cantidadTexto) {
         val cantidad = cantidadTexto.toIntOrNull() ?: 1
         val sugerido = viewModel.calcularPrecioSugerido(variante, cantidad)
         etiquetaEscalon = viewModel.obtenerEtiquetaEscalon(variante, cantidad)
@@ -333,125 +401,228 @@ private fun SelectorVariante(
             .background(FondoTarjeta)
             .padding(16.dp)
     ) {
-        if (variantes.size == 1 && variantes.first().talla == null) {
-            val unico = variantes.first()
-            Text(unico.nombre, color = TextoCrema, fontSize = 16.sp, fontWeight = FontWeight.Medium)
-            if (varianteSeleccionada == null) varianteSeleccionada = unico
-        } else {
-            var colorSeleccionado by remember { mutableStateOf<String?>(null) }
-            val coloresDisponibles = variantes.mapNotNull { it.color }.distinct()
+        Text(variante.nombre, color = TextoCrema, fontSize = 16.sp, fontWeight = FontWeight.Medium)
 
-            Text("Elige color", color = TextoCrema, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+        FilaCantidadYPrecio(
+            cantidadTexto = cantidadTexto,
+            onCantidadChange = { cantidadTexto = it },
+            precioTexto = precioTexto,
+            onPrecioChange = { precioTexto = it },
+            etiquetaEscalon = etiquetaEscalon,
+            stock = variante.stockActual
+        )
+
+        BotonesCancelarAgregar(
+            onCancelar = onCancelar,
+            onAgregar = {
+                val cantidad = cantidadTexto.toIntOrNull() ?: 1
+                val precio = precioTexto.toDoubleOrNull() ?: 0.0
+                onAgregar(variante, cantidad, precio, etiquetaEscalon)
+            }
+        )
+    }
+}
+
+/** Flujo original de a una combinación por vez: color -> talla -> cantidad/precio -> Agregar. */
+@Composable
+private fun SelectorVarianteIndividual(
+    viewModel: VentaViewModel,
+    variantes: List<ProductoEntity>,
+    onAgregar: (ProductoEntity, Int, Double, String) -> Unit,
+    onCancelar: () -> Unit
+) {
+    var varianteSeleccionada by remember { mutableStateOf<ProductoEntity?>(null) }
+    var cantidadTexto by remember { mutableStateOf("1") }
+    var precioTexto by remember { mutableStateOf("") }
+    var etiquetaEscalon by remember { mutableStateOf("Unidad") }
+    var colorSeleccionado by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(varianteSeleccionada, cantidadTexto) {
+        val variante = varianteSeleccionada ?: return@LaunchedEffect
+        val cantidad = cantidadTexto.toIntOrNull() ?: 1
+        val sugerido = viewModel.calcularPrecioSugerido(variante, cantidad)
+        etiquetaEscalon = viewModel.obtenerEtiquetaEscalon(variante, cantidad)
+        precioTexto = "%.2f".format(sugerido)
+    }
+
+    val coloresDisponibles = variantes.mapNotNull { it.color }.distinct()
+
+    Column(modifier = Modifier.padding(top = 12.dp)) {
+        Text("Elige color", color = TextoCrema, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            modifier = Modifier.padding(top = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            coloresDisponibles.forEach { color ->
+                ChipSeleccionable(
+                    texto = color,
+                    seleccionado = colorSeleccionado == color,
+                    onClick = {
+                        colorSeleccionado = color
+                        varianteSeleccionada = null
+                    }
+                )
+            }
+        }
+
+        if (colorSeleccionado != null) {
+            Text(
+                "Elige talla",
+                color = TextoCrema,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                modifier = Modifier.padding(top = 16.dp)
+            )
             FlowRow(
                 modifier = Modifier.padding(top = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                coloresDisponibles.forEach { color ->
-                    val seleccionado = colorSeleccionado == color
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(if (seleccionado) AcentoTerracota else FondoCarbon)
-                            .clickable {
-                                colorSeleccionado = color
-                                varianteSeleccionada = null
-                            }
-                            .padding(horizontal = 14.dp, vertical = 10.dp)
-                    ) {
-                        Text(
-                            text = color,
-                            color = if (seleccionado) FondoCarbon else TextoCrema,
-                            fontSize = 13.sp
+                variantes.filter { it.color == colorSeleccionado }.forEach { variante ->
+                    val sinStock = variante.stockActual <= 0
+                    ChipSeleccionable(
+                        texto = if (sinStock) "Talla ${variante.talla} (agotado)" else "Talla ${variante.talla}",
+                        seleccionado = varianteSeleccionada?.id == variante.id,
+                        habilitado = !sinStock,
+                        onClick = { varianteSeleccionada = variante }
+                    )
+                }
+            }
+        }
+    }
+
+    varianteSeleccionada?.let { variante ->
+        FilaCantidadYPrecio(
+            cantidadTexto = cantidadTexto,
+            onCantidadChange = { cantidadTexto = it },
+            precioTexto = precioTexto,
+            onPrecioChange = { precioTexto = it },
+            etiquetaEscalon = etiquetaEscalon,
+            stock = variante.stockActual
+        )
+
+        BotonesCancelarAgregar(
+            onCancelar = onCancelar,
+            onAgregar = {
+                val cantidad = cantidadTexto.toIntOrNull() ?: 1
+                val precio = precioTexto.toDoubleOrNull() ?: 0.0
+                onAgregar(variante, cantidad, precio, etiquetaEscalon)
+            }
+        )
+    }
+}
+
+/**
+  * Modo mayorista: el vendedor elige una o varias tallas; por cada talla elegida
+ * se despliegan todos los colores disponibles en esa talla, cada uno con su
+ * propio campo de cantidad (0 = no se agrega) y precio editable. Al confirmar,
+ * todas las líneas con cantidad > 0 se agregan al carrito de una sola vez.
+ */
+@Composable
+private fun SelectorMayorista(
+    viewModel: VentaViewModel,
+    variantes: List<ProductoEntity>,
+    onAgregarVarias: (List<VentaViewModel.LineaPendiente>) -> Unit,
+    onCancelar: () -> Unit
+) {
+    val tallasDisponibles = variantes.mapNotNull { it.talla }.distinct()
+        .sortedBy { it.toIntOrNull() ?: Int.MAX_VALUE }
+    var tallasSeleccionadas by remember { mutableStateOf(setOf<String>()) }
+
+    // input de cada variante: clave = variante.id
+    var cantidades by remember { mutableStateOf(mapOf<String, String>()) }
+    var precios by remember { mutableStateOf(mapOf<String, String>()) }
+    var etiquetas by remember { mutableStateOf(mapOf<String, String>()) }
+
+    val coroutineScope = rememberCoroutineScope()
+
+    Column(modifier = Modifier.padding(top = 12.dp)) {
+        Text("Elige una o varias tallas", color = TextoCrema, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+        FlowRow(
+            modifier = Modifier.padding(top = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            tallasDisponibles.forEach { talla ->
+                val hayStock = variantes.any { it.talla == talla && it.stockActual > 0 }
+                ChipSeleccionable(
+                    texto = "Talla $talla",
+                    seleccionado = tallasSeleccionadas.contains(talla),
+                    habilitado = hayStock,
+                    onClick = {
+                        tallasSeleccionadas = if (tallasSeleccionadas.contains(talla)) {
+                            tallasSeleccionadas - talla
+                        } else {
+                            tallasSeleccionadas + talla
+                        }
+                    }
+                )
+            }
+        }
+
+        if (tallasSeleccionadas.isNotEmpty()) {
+            Column(modifier = Modifier.padding(top = 18.dp)) {
+                tallasSeleccionadas.sortedBy { it.toIntOrNull() ?: Int.MAX_VALUE }.forEach { talla ->
+                    Text(
+                        "Talla $talla",
+                        color = TextoCrema,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)
+                    )
+                    variantes.filter { it.talla == talla }.forEach { variante ->
+                        FilaVarianteMayorista(
+                            variante = variante,
+                            cantidadTexto = cantidades[variante.id] ?: "",
+                            precioTexto = precios[variante.id] ?: "",
+                            etiquetaEscalon = etiquetas[variante.id] ?: "Unidad",
+                            onCantidadChange = { nuevo ->
+                                cantidades = cantidades + (variante.id to nuevo)
+                                val cantidad = nuevo.toIntOrNull()
+                                if (cantidad != null && cantidad > 0) {
+                                    coroutineScope.launch {
+                                        val sugerido = viewModel.calcularPrecioSugerido(variante, cantidad)
+                                        val etiqueta = viewModel.obtenerEtiquetaEscalon(variante, cantidad)
+                                        precios = precios + (variante.id to "%.2f".format(sugerido))
+                                        etiquetas = etiquetas + (variante.id to etiqueta)
+                                    }
+                                }
+                            },
+                            onPrecioChange = { precios = precios + (variante.id to it) }
                         )
                     }
                 }
             }
 
-            if (colorSeleccionado != null) {
-                Text(
-                    "Elige talla",
-                    color = TextoCrema,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(top = 16.dp)
-                )
-                FlowRow(
-                    modifier = Modifier.padding(top = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    variantes.filter { it.color == colorSeleccionado }.forEach { variante ->
-                        val seleccionada = varianteSeleccionada?.id == variante.id
-                        val sinStock = variante.stockActual <= 0
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(if (seleccionada) AcentoTerracota else FondoCarbon)
-                                .clickable(enabled = !sinStock) { varianteSeleccionada = variante }
-                                .padding(horizontal = 14.dp, vertical = 10.dp)
-                        ) {
-                            Text(
-                                text = if (sinStock) "Talla ${variante.talla} (agotado)" else "Talla ${variante.talla}",
-                                color = if (sinStock) TextoCremaApagado else TextoCrema,
-                                fontSize = 13.sp
-                            )
-                        }
-                    }
+            val lineasParaAgregar = tallasSeleccionadas
+                .flatMap { talla -> variantes.filter { it.talla == talla } }
+                .mapNotNull { variante ->
+                    val cantidad = cantidades[variante.id]?.toIntOrNull() ?: 0
+                    val precio = precios[variante.id]?.toDoubleOrNull()
+                    if (cantidad > 0 && precio != null) {
+                        VentaViewModel.LineaPendiente(
+                            variante = variante,
+                            cantidad = cantidad,
+                            precioUnitario = precio,
+                            etiquetaEscalon = etiquetas[variante.id] ?: "Unidad"
+                        )
+                    } else null
                 }
-            }
-        }
 
-        varianteSeleccionada?.let { variante ->
-            Row(
-                modifier = Modifier.padding(top = 16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Cantidad:", color = TextoCremaApagado, fontSize = 14.sp)
-                TextField(
-                    value = cantidadTexto,
-                    onValueChange = { nuevo -> if (nuevo.all { it.isDigit() }) cantidadTexto = nuevo },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier
-                        .padding(start = 12.dp)
-                        .size(width = 80.dp, height = 52.dp),
-                    colors = camposTextoColores(),
-                    shape = RoundedCornerShape(10.dp)
-                )
+            val totalUnidades = lineasParaAgregar.sumOf { it.cantidad }
+            val totalMonto = lineasParaAgregar.sumOf { it.cantidad * it.precioUnitario }
+
+            if (lineasParaAgregar.isNotEmpty()) {
                 Text(
-                    text = "Stock: ${variante.stockActual}",
+                    "$totalUnidades unidades · S/ ${"%.2f".format(totalMonto)}",
                     color = TextoCremaApagado,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(start = 12.dp)
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(top = 14.dp)
                 )
             }
 
-            Row(
-                modifier = Modifier.padding(top = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("Precio (${etiquetaEscalon}):", color = TextoCremaApagado, fontSize = 14.sp)
-                TextField(
-                    value = precioTexto,
-                    onValueChange = { nuevo -> if (nuevo.all { it.isDigit() || it == '.' }) precioTexto = nuevo },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    modifier = Modifier
-                        .padding(start = 12.dp)
-                        .size(width = 100.dp, height = 52.dp),
-                    colors = camposTextoColores(),
-                    shape = RoundedCornerShape(10.dp)
-                )
-                Text(
-                    text = "editable",
-                    color = TextoCremaApagado,
-                    fontSize = 11.sp,
-                    modifier = Modifier.padding(start = 8.dp)
-                )
-            }
-
-            Row(modifier = Modifier.padding(top = 16.dp)) {
+            Row(modifier = Modifier.padding(top = 12.dp)) {
                 Button(
                     onClick = onCancelar,
                     colors = ButtonDefaults.buttonColors(containerColor = FondoCarbon),
@@ -461,17 +632,177 @@ private fun SelectorVariante(
                 }
                 Spacer(modifier = Modifier.size(12.dp))
                 Button(
-                    onClick = {
-                        val cantidad = cantidadTexto.toIntOrNull() ?: 1
-                        val precio = precioTexto.toDoubleOrNull() ?: 0.0
-                        onAgregar(variante, cantidad, precio, etiquetaEscalon)
-                    },
+                    onClick = { onAgregarVarias(lineasParaAgregar) },
+                    enabled = lineasParaAgregar.isNotEmpty(),
                     colors = ButtonDefaults.buttonColors(containerColor = AcentoTerracota),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("Agregar", color = FondoCarbon, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "Agregar todo (${lineasParaAgregar.size})",
+                        color = FondoCarbon,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun FilaVarianteMayorista(
+    variante: ProductoEntity,
+    cantidadTexto: String,
+    precioTexto: String,
+    etiquetaEscalon: String,
+    onCantidadChange: (String) -> Unit,
+    onPrecioChange: (String) -> Unit
+) {
+    val sinStock = variante.stockActual <= 0
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(FondoCarbon)
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = variante.color ?: "Sin color",
+                color = if (sinStock) TextoCremaApagado else TextoCrema,
+                fontSize = 13.sp
+            )
+            Text(
+                text = if (sinStock) "Agotado" else "Stock: ${variante.stockActual} · $etiquetaEscalon",
+                color = TextoCremaApagado,
+                fontSize = 11.sp
+            )
+        }
+        TextField(
+            value = cantidadTexto,
+            onValueChange = { nuevo -> if (nuevo.all { it.isDigit() }) onCantidadChange(nuevo) },
+            enabled = !sinStock,
+            placeholder = { Text("0", color = TextoCremaApagado) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier.size(width = 64.dp, height = 48.dp),
+            colors = camposTextoColores(),
+            shape = RoundedCornerShape(8.dp)
+        )
+        TextField(
+            value = precioTexto,
+            onValueChange = { nuevo -> if (nuevo.all { it.isDigit() || it == '.' }) onPrecioChange(nuevo) },
+            enabled = !sinStock,
+            placeholder = { Text("S/", color = TextoCremaApagado) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            modifier = Modifier
+                .padding(start = 8.dp)
+                .size(width = 76.dp, height = 48.dp),
+            colors = camposTextoColores(),
+            shape = RoundedCornerShape(8.dp)
+        )
+    }
+}
+
+@Composable
+private fun ChipSeleccionable(
+    texto: String,
+    seleccionado: Boolean,
+    habilitado: Boolean = true,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (seleccionado) AcentoTerracota else FondoCarbon)
+            .clickable(enabled = habilitado, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp)
+    ) {
+        Text(
+            text = texto,
+            color = if (!habilitado) TextoCremaApagado else if (seleccionado) FondoCarbon else TextoCrema,
+            fontSize = 13.sp
+        )
+    }
+}
+
+@Composable
+private fun FilaCantidadYPrecio(
+    cantidadTexto: String,
+    onCantidadChange: (String) -> Unit,
+    precioTexto: String,
+    onPrecioChange: (String) -> Unit,
+    etiquetaEscalon: String,
+    stock: Int
+) {
+    Row(
+        modifier = Modifier.padding(top = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("Cantidad:", color = TextoCremaApagado, fontSize = 14.sp)
+        TextField(
+            value = cantidadTexto,
+            onValueChange = { nuevo -> if (nuevo.all { it.isDigit() }) onCantidadChange(nuevo) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+            modifier = Modifier
+                .padding(start = 12.dp)
+                .size(width = 80.dp, height = 52.dp),
+            colors = camposTextoColores(),
+            shape = RoundedCornerShape(10.dp)
+        )
+        Text(
+            text = "Stock: $stock",
+            color = TextoCremaApagado,
+            fontSize = 12.sp,
+            modifier = Modifier.padding(start = 12.dp)
+        )
+    }
+
+    Row(
+        modifier = Modifier.padding(top = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("Precio (${etiquetaEscalon}):", color = TextoCremaApagado, fontSize = 14.sp)
+        TextField(
+            value = precioTexto,
+            onValueChange = { nuevo -> if (nuevo.all { it.isDigit() || it == '.' }) onPrecioChange(nuevo) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            modifier = Modifier
+                .padding(start = 12.dp)
+                .size(width = 100.dp, height = 52.dp),
+            colors = camposTextoColores(),
+            shape = RoundedCornerShape(10.dp)
+        )
+        Text(
+            text = "editable",
+            color = TextoCremaApagado,
+            fontSize = 11.sp,
+            modifier = Modifier.padding(start = 8.dp)
+        )
+    }
+}
+
+@Composable
+private fun BotonesCancelarAgregar(onCancelar: () -> Unit, onAgregar: () -> Unit) {
+    Row(modifier = Modifier.padding(top = 16.dp)) {
+        Button(
+            onClick = onCancelar,
+            colors = ButtonDefaults.buttonColors(containerColor = FondoCarbon),
+            modifier = Modifier.weight(1f)
+        ) {
+            Text("Cancelar", color = TextoCremaApagado)
+        }
+        Spacer(modifier = Modifier.size(12.dp))
+        Button(
+            onClick = onAgregar,
+            colors = ButtonDefaults.buttonColors(containerColor = AcentoTerracota),
+            modifier = Modifier.weight(1f)
+        ) {
+            Text("Agregar", color = FondoCarbon, fontWeight = FontWeight.SemiBold)
         }
     }
 }
