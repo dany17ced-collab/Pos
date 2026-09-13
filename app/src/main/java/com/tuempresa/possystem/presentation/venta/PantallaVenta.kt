@@ -19,7 +19,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -90,7 +93,7 @@ fun PantallaVenta(app: POSApplication, onVolver: () -> Unit) {
         if (concedido) mostrandoEscaner = true
     }
 
-    Surface(modifier = Modifier.fillMaxSize(), color = FondoCarbon) {
+    Surface(modifier = Modifier.fillMaxSize().imePadding(), color = FondoCarbon) {
         when {
             mostrandoEscaner -> {
                 Box(modifier = Modifier.fillMaxSize()) {
@@ -131,71 +134,81 @@ fun PantallaVenta(app: POSApplication, onVolver: () -> Unit) {
 
             else -> {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    EncabezadoVenta(onVolver = onVolver)
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        EncabezadoVenta(onVolver = onVolver)
 
-                    BarraBusqueda(
-                        texto = textoBusqueda,
-                        onTextoCambiado = {
-                            textoBusqueda = it
-                            viewModel.buscarPorTexto(it)
-                        },
-                        onEscanear = {
-                            if (tienePermisoCamara(context)) {
-                                mostrandoEscaner = true
-                            } else {
-                                lanzadorPermiso.launch(Manifest.permission.CAMERA)
-                            }
-                        }
-                    )
-
-                    when (val resultado = resultadoBusqueda) {
-                        is ResultadoBusqueda.VariosResultados -> {
-                            ListaCoincidencias(
-                                productos = resultado.productos,
-                                onSeleccionar = { viewModel.elegirProducto(it) }
-                            )
-                        }
-                        is ResultadoBusqueda.Encontrado -> {
-                            SelectorVariante(
-                                viewModel = viewModel,
-                                variantes = resultado.variantes,
-                                onAgregar = { variante, cantidad, precio, etiqueta ->
-                                    viewModel.agregarAlCarrito(variante, cantidad, precio, etiqueta)
-                                    textoBusqueda = ""
-                                },
-                                onAgregarVarias = { lineas ->
-                                    viewModel.agregarVariasAlCarrito(lineas)
-                                    textoBusqueda = ""
-                                },
-                                onCancelar = {
-                                    viewModel.limpiarBusqueda()
-                                    textoBusqueda = ""
+                        BarraBusqueda(
+                            texto = textoBusqueda,
+                            onTextoCambiado = {
+                                textoBusqueda = it
+                                viewModel.buscarPorTexto(it)
+                            },
+                            onEscanear = {
+                                if (tienePermisoCamara(context)) {
+                                    mostrandoEscaner = true
+                                } else {
+                                    lanzadorPermiso.launch(Manifest.permission.CAMERA)
                                 }
-                            )
+                            }
+                        )
+
+                        when (val resultado = resultadoBusqueda) {
+                            is ResultadoBusqueda.VariosResultados -> {
+                                ListaCoincidencias(
+                                    productos = resultado.productos,
+                                    onSeleccionar = { viewModel.elegirProducto(it) }
+                                )
+                            }
+                            is ResultadoBusqueda.Encontrado -> {
+                                SelectorVariante(
+                                    viewModel = viewModel,
+                                    variantes = resultado.variantes,
+                                    onAgregar = { variante, cantidad, precio, etiqueta ->
+                                        viewModel.agregarAlCarrito(variante, cantidad, precio, etiqueta)
+                                        textoBusqueda = ""
+                                    },
+                                    onAgregarVarias = { lineas ->
+                                        viewModel.agregarVariasAlCarrito(lineas)
+                                        textoBusqueda = ""
+                                    },
+                                    onCancelar = {
+                                        viewModel.limpiarBusqueda()
+                                        textoBusqueda = ""
+                                    }
+                                )
+                            }
+                            is ResultadoBusqueda.NoEncontrado -> {
+                                Text(
+                                    text = "No se encontró ningún producto",
+                                    color = ColorError,
+                                    fontSize = 14.sp,
+                                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
+                                )
+                            }
+                            is ResultadoBusqueda.Buscando -> {
+                                Text(
+                                    text = "Buscando…",
+                                    color = TextoCremaApagado,
+                                    fontSize = 14.sp,
+                                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
+                                )
+                            }
+                            is ResultadoBusqueda.SinBuscar -> Unit
                         }
-                        is ResultadoBusqueda.NoEncontrado -> {
-                            Text(
-                                text = "No se encontró ningún producto",
-                                color = ColorError,
-                                fontSize = 14.sp,
-                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
-                            )
-                        }
-                        is ResultadoBusqueda.Buscando -> {
-                            Text(
-                                text = "Buscando…",
-                                color = TextoCremaApagado,
-                                fontSize = 14.sp,
-                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
-                            )
-                        }
-                        is ResultadoBusqueda.SinBuscar -> Unit
+
+                        // El carrito ya no va aquí: se muestra fijo debajo de este
+                        // bloque scrolleable para que el vendedor nunca pierda de
+                        // vista el total mientras arma un pedido largo (mayorista).
                     }
 
                     CarritoLista(
                         lineas = carrito,
                         onQuitar = { viewModel.quitarDelCarrito(it) },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.heightIn(max = 180.dp)
                     )
 
                     PieCarrito(
@@ -489,33 +502,8 @@ private fun SelectorVarianteIndividual(
                         onClick = { varianteSeleccionada = variante }
                     )
                 }
-            }
-        }
-    }
-
-    varianteSeleccionada?.let { variante ->
-        FilaCantidadYPrecio(
-            cantidadTexto = cantidadTexto,
-            onCantidadChange = { cantidadTexto = it },
-            precioTexto = precioTexto,
-            onPrecioChange = { precioTexto = it },
-            etiquetaEscalon = etiquetaEscalon,
-            stock = variante.stockActual
-        )
-
-        BotonesCancelarAgregar(
-            onCancelar = onCancelar,
-            onAgregar = {
-                val cantidad = cantidadTexto.toIntOrNull() ?: 1
-                val precio = precioTexto.toDoubleOrNull() ?: 0.0
-                onAgregar(variante, cantidad, precio, etiquetaEscalon)
-            }
-        )
-    }
-}
-
-/**
-* Modo mayorista: el vendedor elige una o varias tallas; por cada talla elegida
+            /**
+ * Modo mayorista: el vendedor elige una o varias tallas; por cada talla elegida
  * primero elige QUÉ colores participan en esa talla para este pedido (no todos
  * los colores cargados aplican siempre), y recién ahí aparece una fila de
  * cantidad/precio por cada color elegido. Al confirmar, todas las líneas con
@@ -583,63 +571,54 @@ private fun SelectorMayorista(
             }
 
         if (tallasSeleccionadas.isNotEmpty()) {
-            // Altura acotada con scroll propio: si hay varias tallas con varios
-            // colores cada una, la lista completa no cabría en pantalla junto
-            // con el carrito de abajo.
-            LazyColumn(
-                modifier = Modifier
-                    .padding(top = 16.dp)
-                    .heightIn(max = 340.dp),
+            // Sin altura fija ni scroll propio: todo el bloque de arriba (búsqueda +
+            // selector) ya scrollea junto como una sola pantalla (ver el
+            // verticalScroll en PantallaVenta), así el teclado nunca tapa contenido.
+            Column(
+                modifier = Modifier.padding(top = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 tallasSeleccionadas.sortedBy { it.toIntOrNull() ?: Int.MAX_VALUE }.forEach { talla ->
                     val coloresDeLaTalla = variantes.filter { it.talla == talla }.mapNotNull { it.color }.distinct()
                     val coloresElegidos = coloresPorTalla[talla] ?: emptySet()
 
-                    item(key = "encabezado_$talla") {
-                        Text(
-                            "Talla $talla",
-                            color = TextoCrema,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                            modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)
-                        )
-                    }
+                    Text(
+                        "Talla $talla",
+                        color = TextoCrema,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(top = 10.dp, bottom = 6.dp)
+                    )
 
-                    item(key = "colores_$talla") {
-                        Column {
-                            Text(
-                                "¿Qué colores lleva en esta talla?",
-                                color = TextoCremaApagado,
-                                fontSize = 12.sp
-                            )
-                            FlowRow(
-                                modifier = Modifier.padding(top = 6.dp, bottom = 8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                coloresDeLaTalla.forEach { color ->
-                                    val variante = variantes.find { it.talla == talla && it.color == color }
-                                    val sinStock = (variante?.stockActual ?: 0) <= 0
-                                    ChipSeleccionable(
-                                        texto = color,
-                                        seleccionado = coloresElegidos.contains(color),
-                                        habilitado = !sinStock,
-                                        onClick = {
-                                            val actuales = coloresPorTalla[talla] ?: emptySet()
-                                            coloresPorTalla = coloresPorTalla + (talla to
-                                                if (actuales.contains(color)) actuales - color else actuales + color)
-                                        }
-                                    )
-                                }
+                    Column {
+                        Text(
+                            "¿Qué colores lleva en esta talla?",
+                            color = TextoCremaApagado,
+                            fontSize = 12.sp
+                        )
+                        FlowRow(
+                            modifier = Modifier.padding(top = 6.dp, bottom = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            coloresDeLaTalla.forEach { color ->
+                                val variante = variantes.find { it.talla == talla && it.color == color }
+                                val sinStock = (variante?.stockActual ?: 0) <= 0
+                                ChipSeleccionable(
+                                    texto = color,
+                                    seleccionado = coloresElegidos.contains(color),
+                                    habilitado = !sinStock,
+                                    onClick = {
+                                        val actuales = coloresPorTalla[talla] ?: emptySet()
+                                        coloresPorTalla = coloresPorTalla + (talla to
+                                            if (actuales.contains(color)) actuales - color else actuales + color)
+                                    }
+                                )
                             }
                         }
                     }
 
-                    items(
-                        variantes.filter { it.talla == talla && coloresElegidos.contains(it.color) },
-                        key = { it.id }
-                    ) { variante ->
+                    variantes.filter { it.talla == talla && coloresElegidos.contains(it.color) }.forEach { variante ->
                         FilaVarianteMayorista(
                             variante = variante,
                             cantidadTexto = cantidades[variante.id] ?: "",
@@ -880,7 +859,10 @@ private fun CarritoLista(
     modifier: Modifier = Modifier
 ) {
     if (lineas.isEmpty()) {
-        Box(modifier = modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+        Box(
+            modifier = modifier.fillMaxWidth().heightIn(min = 80.dp),
+            contentAlignment = Alignment.Center
+        ) {
             Text("El carrito está vacío", color = TextoCremaApagado, fontSize = 14.sp)
         }
         return
