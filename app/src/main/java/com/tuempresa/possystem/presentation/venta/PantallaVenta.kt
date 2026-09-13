@@ -515,12 +515,7 @@ private fun SelectorVarianteIndividual(
 }
 
 /**
- * Modo mayorista: el vendedor elige una o varias tallas; por cada talla elegida
- * se despliegan todos los colores disponibles en esa talla, cada uno con su
- * propio campo de cantidad (0 = no se agrega) y precio editable. Al confirmar,
- * todas las líneas con cantidad > 0 se agregan al carrito de una sola vez.
-/**
- * Modo mayorista: el vendedor elige una o varias tallas; por cada talla elegida
+* Modo mayorista: el vendedor elige una o varias tallas; por cada talla elegida
  * primero elige QUÉ colores participan en esa talla para este pedido (no todos
  * los colores cargados aplican siempre), y recién ahí aparece una fila de
  * cantidad/precio por cada color elegido. Al confirmar, todas las líneas con
