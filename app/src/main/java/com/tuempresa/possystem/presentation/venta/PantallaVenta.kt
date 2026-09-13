@@ -502,7 +502,7 @@ private fun SelectorVarianteIndividual(
                         onClick = { varianteSeleccionada = variante }
                     )
                 }
-            /**
+ /**
  * Modo mayorista: el vendedor elige una o varias tallas; por cada talla elegida
  * primero elige QUÉ colores participan en esa talla para este pedido (no todos
  * los colores cargados aplican siempre), y recién ahí aparece una fila de
