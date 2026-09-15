@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Los reportes se generan en cacheDir/reportes (ver ExportadorReportes.kt) -->
-    <cache-path name="reportes" path="reportes/" />
-</paths>
