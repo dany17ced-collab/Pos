@@ -66,7 +66,8 @@ fun PantallaHomeAdmin(
         OpcionMenu("Vender", "Escanear y cobrar productos", "venta"),
         OpcionMenu("Inventario", "Productos, tallas, colores y precios", "inventario"),
         OpcionMenu("Reportes y caja", "Corte X/Z, historial, más vendidos", "reportes"),
-        OpcionMenu("Usuarios", "Vendedores y permisos de acceso", "usuarios")
+        OpcionMenu("Usuarios", "Vendedores y permisos de acceso", "usuarios"),
+        OpcionMenu("Ajustes de boleta", "Logo, eslogan, dirección e impresora", "ajustes_boleta")
     )
 
     PantallaHomeBase(
