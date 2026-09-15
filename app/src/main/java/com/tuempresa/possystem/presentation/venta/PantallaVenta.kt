@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.size
@@ -30,6 +31,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
+import coil.compose.AsyncImage
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -63,6 +67,10 @@ import com.tuempresa.possystem.data.local.entity.MetodoPago
 import com.tuempresa.possystem.data.local.entity.ProductoEntity
 import com.tuempresa.possystem.domain.boleta.DispositivoBluetooth
 import kotlinx.coroutines.launch
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 // Misma paleta cálida tipo boutique usada en Login y Home
 private val FondoCarbon = Color(0xFF221B1D)
@@ -993,6 +1001,7 @@ private fun PantallaCheckout(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(24.dp)
     ) {
         Text(
@@ -1141,6 +1150,15 @@ private fun SeccionBoletaEmitida(
     val context = LocalContext.current
     var mostrandoSelectorImpresora by remember { mutableStateOf(false) }
     var accionPendientePermiso by remember { mutableStateOf<(() -> Unit)?>(null) }
+    // Se guarda aparte porque, mientras se genera el PDF o se busca impresora,
+    // estadoBoleta cambia a otros valores y la vista previa no debe desaparecer de pantalla.
+    var datosVistaPrevia by remember { mutableStateOf<DatosBoleta?>(null) }
+
+    // Al entrar a esta pantalla se carga automáticamente la vista previa de la
+    // boleta, para que el vendedor la revise ANTES de compartirla o imprimirla.
+    LaunchedEffect(ventaId) {
+        viewModel.cargarVistaPrevia(ventaId)
+    }
 
     val lanzadorPermisosBluetooth = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -1157,6 +1175,15 @@ private fun SeccionBoletaEmitida(
         } else {
             accionPendientePermiso = accion
             lanzadorPermisosBluetooth.launch(permisosBluetoothNecesarios())
+        }
+    }
+
+    // Guarda la vista previa apenas llega, y no la borra aunque el estado luego
+    // pase a Generando/Buscando/Imprimiendo — sólo la reemplaza si llega una nueva.
+    LaunchedEffect(estadoBoleta) {
+        val estado = estadoBoleta
+        if (estado is EstadoBoleta.VistaPreviaLista) {
+            datosVistaPrevia = estado.datos
         }
     }
 
@@ -1182,7 +1209,9 @@ private fun SeccionBoletaEmitida(
     }
 
     Column(
-        modifier = Modifier.padding(top = 32.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text("✓ Venta registrada", color = ColorExito, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
@@ -1190,8 +1219,27 @@ private fun SeccionBoletaEmitida(
             Text("Folio #$folio", color = TextoCremaApagado, fontSize = 14.sp)
         }
 
+        Text(
+            "Vista previa de la boleta",
+            color = TextoCremaApagado,
+            fontSize = 12.sp,
+            modifier = Modifier.padding(top = 18.dp, bottom = 8.dp)
+        )
+
+        when {
+            datosVistaPrevia != null -> {
+                VistaPreviaBoleta(datos = datosVistaPrevia!!)
+            }
+            estadoBoleta is EstadoBoleta.CargandoVistaPrevia -> {
+                Text("Cargando vista previa…", color = TextoCremaApagado, fontSize = 13.sp)
+            }
+            estadoBoleta is EstadoBoleta.Error && datosVistaPrevia == null -> {
+                Text((estadoBoleta as EstadoBoleta.Error).mensaje, color = ColorError, fontSize = 13.sp)
+            }
+        }
+
         Row(
-            modifier = Modifier.padding(top = 24.dp),
+            modifier = Modifier.padding(top = 20.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Box(
@@ -1249,12 +1297,15 @@ private fun SeccionBoletaEmitida(
                 )
             }
             is EstadoBoleta.Error -> {
-                Text(
-                    estado.mensaje,
-                    color = ColorError,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(top = 10.dp)
-                )
+                // Si no hay vista previa cargada, este mismo error ya se mostró arriba.
+                if (datosVistaPrevia != null) {
+                    Text(
+                        estado.mensaje,
+                        color = ColorError,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(top = 10.dp)
+                    )
+                }
             }
             else -> {}
         }
@@ -1281,6 +1332,155 @@ private fun SeccionBoletaEmitida(
                 viewModel.detenerBusquedaImpresoras()
                 viewModel.reiniciarEstadoBoleta()
             }
+        )
+    }
+}
+
+/**
+ * Dibuja la boleta como se verá al compartirla/imprimirla, para que el
+ * vendedor la revise antes de emitirla de verdad. Imita el ancho angosto
+ * de un ticket térmico, ya que ese es el caso más restrictivo (58mm); si
+ * cabe bien aquí, cabe bien también en el PDF A4.
+ */
+@Composable
+private fun VistaPreviaBoleta(datos: DatosBoleta) {
+    val venta = datos.venta
+    val configuracion = datos.configuracion
+    val folioTexto = venta.folio?.toString()?.padStart(6, '0') ?: venta.id.take(8)
+
+    Column(
+        modifier = Modifier
+            .width(260.dp)
+            .clip(RoundedCornerShape(4.dp))
+            .background(Color(0xFFFDF8F3))
+            .padding(vertical = 16.dp, horizontal = 14.dp)
+    ) {
+        val rutaLogo = configuracion?.rutaLogo
+        if (rutaLogo != null && File(rutaLogo).exists()) {
+            AsyncImage(
+                model = rutaLogo,
+                contentDescription = "Logo de la tienda",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .align(Alignment.CenterHorizontally)
+                    .height(48.dp)
+                    .padding(bottom = 6.dp)
+            )
+        }
+
+        Text(
+            configuracion?.nombreTienda?.takeIf { it.isNotBlank() } ?: "Mi Tienda",
+            color = Color(0xFF221B1D),
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+        configuracion?.eslogan?.takeIf { it.isNotBlank() }?.let {
+            Text(
+                it,
+                color = Color(0xFF5A5250),
+                fontSize = 10.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(top = 1.dp)
+            )
+        }
+        configuracion?.direccion?.takeIf { it.isNotBlank() }?.let {
+            Text(it, color = Color(0xFF7A7270), fontSize = 9.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+        }
+        configuracion?.telefono?.takeIf { it.isNotBlank() }?.let {
+            Text("Tel: $it", color = Color(0xFF7A7270), fontSize = 9.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+        }
+        configuracion?.ruc?.takeIf { it.isNotBlank() }?.let {
+            Text("RUC: $it", color = Color(0xFF7A7270), fontSize = 9.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+        }
+
+        LineaPunteadaPreview()
+
+        Text(
+            "Boleta N° $folioTexto",
+            color = Color(0xFF221B1D),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(top = 6.dp)
+        )
+        Text(
+            SimpleDateFormat("dd/MM/yyyy HH:mm", Locale("es", "PE")).format(Date(venta.fecha)),
+            color = Color(0xFF7A7270),
+            fontSize = 9.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        LineaPunteadaPreview()
+
+        datos.detalles.forEach { linea ->
+            Text(linea.nombreProducto, color = Color(0xFF221B1D), fontSize = 10.5.sp, fontWeight = FontWeight.Medium, modifier = Modifier.padding(top = 6.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    "${linea.cantidad} x S/ ${"%.2f".format(linea.precioUnitario)}",
+                    color = Color(0xFF7A7270),
+                    fontSize = 9.5.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                Text(
+                    "S/ ${"%.2f".format(linea.subtotal)}",
+                    color = Color(0xFF221B1D),
+                    fontSize = 10.sp
+                )
+            }
+        }
+
+        LineaPunteadaPreview()
+
+        FilaTotalPreview("Subtotal", "S/ ${"%.2f".format(venta.subtotal)}")
+        if (venta.descuento > 0) FilaTotalPreview("Descuento", "-S/ ${"%.2f".format(venta.descuento)}")
+        if (venta.impuestos > 0) FilaTotalPreview("Impuestos", "S/ ${"%.2f".format(venta.impuestos)}")
+        FilaTotalPreview("TOTAL", "S/ ${"%.2f".format(venta.total)}", resaltar = true)
+        FilaTotalPreview("Pago (${etiquetaMetodoPago(venta.metodoPago)})", "S/ ${"%.2f".format(venta.montoRecibido ?: venta.total)}")
+        if (venta.metodoPago == MetodoPago.EFECTIVO && venta.cambio != null && venta.cambio > 0) {
+            FilaTotalPreview("Cambio", "S/ ${"%.2f".format(venta.cambio)}")
+        }
+
+        LineaPunteadaPreview()
+
+        Text(
+            configuracion?.piePagina?.takeIf { it.isNotBlank() } ?: "¡Gracias por su compra!",
+            color = Color(0xFF5A5250),
+            fontSize = 10.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+        )
+    }
+}
+
+@Composable
+private fun LineaPunteadaPreview() {
+    Text(
+        "- - - - - - - - - - - - - - - -",
+        color = Color(0xFFCBBFB8),
+        fontSize = 9.sp,
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+    )
+}
+
+@Composable
+private fun FilaTotalPreview(etiqueta: String, valor: String, resaltar: Boolean = false) {
+    Row(modifier = Modifier.fillMaxWidth().padding(top = 2.dp)) {
+        Text(
+            etiqueta,
+            color = Color(0xFF221B1D),
+            fontSize = if (resaltar) 12.sp else 10.sp,
+            fontWeight = if (resaltar) FontWeight.Bold else FontWeight.Normal,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            valor,
+            color = Color(0xFF221B1D),
+            fontSize = if (resaltar) 12.sp else 10.sp,
+            fontWeight = if (resaltar) FontWeight.Bold else FontWeight.Normal
         )
     }
 }
