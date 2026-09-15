@@ -44,9 +44,11 @@ sealed class EstadoCobro {
     data class Error(val mensaje: String) : EstadoCobro()
 }
 
-/** Estado de las acciones sobre la boleta ya emitida: compartir PDF o imprimir en la térmica. */
+/** Estado de las acciones sobre la boleta ya emitida: vista previa, compartir PDF o imprimir en la térmica. */
 sealed class EstadoBoleta {
     object Inactivo : EstadoBoleta()
+    object CargandoVistaPrevia : EstadoBoleta()
+    data class VistaPreviaLista(val datos: DatosBoleta) : EstadoBoleta()
     object GenerandoPdf : EstadoBoleta()
     data class PdfListo(val uri: Uri) : EstadoBoleta()
     object BuscandoImpresoras : EstadoBoleta()
@@ -55,6 +57,13 @@ sealed class EstadoBoleta {
     object ImpresionExitosa : EstadoBoleta()
     data class Error(val mensaje: String) : EstadoBoleta()
 }
+
+/** Datos ya resueltos de la boleta, listos para pintar la vista previa en pantalla. */
+data class DatosBoleta(
+    val venta: VentaEntity,
+    val detalles: List<DetalleVentaEntity>,
+    val configuracion: ConfiguracionTiendaEntity?
+)
 
 class VentaViewModel(private val app: POSApplication) : ViewModel() {
 
@@ -277,14 +286,36 @@ class VentaViewModel(private val app: POSApplication) : ViewModel() {
         _estadoCobro.value = EstadoCobro.Inactivo
     }
 
-    // ---- Boleta: compartir PDF (A4) e imprimir en térmica (58mm) ----
+    // ---- Boleta: vista previa, compartir PDF (A4) e imprimir en térmica (58mm) ----
 
     /** Recupera la venta + detalles ya guardados y la configuración de tienda vigente. */
-    private suspend fun obtenerDatosBoleta(ventaId: String): Triple<VentaEntity, List<DetalleVentaEntity>, ConfiguracionTiendaEntity?>? {
+    private suspend fun obtenerDatosBoleta(ventaId: String): DatosBoleta? {
         val venta = ventaDao.obtenerPorId(ventaId) ?: return null
         val detalles = ventaDao.obtenerDetallesDeVenta(ventaId)
         val configuracion = configuracionTiendaDao.obtener()
-        return Triple(venta, detalles, configuracion)
+        return DatosBoleta(venta, detalles, configuracion)
+    }
+
+    /**
+     * Carga los datos de la venta recién cobrada para mostrarlos como vista
+     * previa de la boleta ANTES de compartir o imprimir — así el vendedor
+     * puede verificar que todo esté correcto (productos, totales, logo, etc.)
+     * antes de emitirla de verdad.
+     */
+    fun cargarVistaPrevia(ventaId: String) {
+        viewModelScope.launch {
+            _estadoBoleta.value = EstadoBoleta.CargandoVistaPrevia
+            try {
+                val datos = obtenerDatosBoleta(ventaId)
+                if (datos == null) {
+                    _estadoBoleta.value = EstadoBoleta.Error("No se encontró la venta.")
+                    return@launch
+                }
+                _estadoBoleta.value = EstadoBoleta.VistaPreviaLista(datos)
+            } catch (e: Exception) {
+                _estadoBoleta.value = EstadoBoleta.Error("No se pudo cargar la vista previa de la boleta.")
+            }
+        }
     }
 
     /** Genera el PDF en tamaño A4 en caché y devuelve su Uri (vía FileProvider) lista para compartir. */
