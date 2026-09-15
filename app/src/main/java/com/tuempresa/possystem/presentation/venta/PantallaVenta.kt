@@ -1011,20 +1011,22 @@ private fun PantallaCheckout(
             modifier = Modifier.clickable(enabled = estadoCobro !is EstadoCobro.Procesando, onClick = onVolver)
         )
 
-        Text(
-            text = "Cobrar",
-            color = TextoCrema,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(top = 16.dp)
-        )
-        Text(
-            text = "S/ ${"%.2f".format(total)}",
-            color = AcentoTerracota,
-            fontSize = 34.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(top = 4.dp)
-        )
+        if (estadoCobro !is EstadoCobro.Exitoso) {
+            Text(
+                text = "Cobrar",
+                color = TextoCrema,
+                fontSize = 24.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(top = 16.dp)
+            )
+            Text(
+                text = "S/ ${"%.2f".format(total)}",
+                color = AcentoTerracota,
+                fontSize = 34.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        }
 
         when (estadoCobro) {
             is EstadoCobro.Exitoso -> {
@@ -1214,7 +1216,7 @@ private fun SeccionBoletaEmitida(
             .padding(top = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text("✓ Venta registrada", color = ColorExito, fontSize = 20.sp, fontWeight = FontWeight.SemiBold)
+        Text("✓ Venta registrada", color = ColorExito, fontSize = 24.sp, fontWeight = FontWeight.SemiBold)
         if (folio != null) {
             Text("Folio #$folio", color = TextoCremaApagado, fontSize = 14.sp)
         }
