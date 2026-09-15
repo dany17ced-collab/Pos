@@ -16,6 +16,7 @@ import androidx.navigation.navArgument
 import com.tuempresa.possystem.CrashHandler
 import com.tuempresa.possystem.POSApplication
 import com.tuempresa.possystem.data.local.entity.RolUsuario
+import com.tuempresa.possystem.presentation.ajustes.PantallaAjustesBoleta
 import com.tuempresa.possystem.presentation.home.PantallaHomeAdmin
 import com.tuempresa.possystem.presentation.home.PantallaHomeVendedor
 import com.tuempresa.possystem.presentation.home.PantallaProximamente
@@ -45,6 +46,7 @@ private object Rutas {
     const val USUARIOS = "usuarios"
     const val INVENTARIO_CONSULTA = "inventario_consulta"
     const val MIS_VENTAS = "mis_ventas"
+    const val AJUSTES_BOLETA = "ajustes_boleta"
 }
 
 @Composable
@@ -111,6 +113,7 @@ fun GrafoNavegacionPrincipal(app: POSApplication) {
                         "inventario" -> navController.navigate(Rutas.INVENTARIO)
                         "reportes" -> navController.navigate(Rutas.REPORTES)
                         "usuarios" -> navController.navigate(Rutas.USUARIOS)
+                        "ajustes_boleta" -> navController.navigate(Rutas.AJUSTES_BOLETA)
                         else -> navController.navigate("proximamente/$ruta")
                     }
                 },
@@ -159,6 +162,10 @@ fun GrafoNavegacionPrincipal(app: POSApplication) {
 
         composable(Rutas.MIS_VENTAS) {
             PantallaMisVentas(app = app, onVolver = { navController.popBackStack() })
+        }
+
+        composable(Rutas.AJUSTES_BOLETA) {
+            PantallaAjustesBoleta(app = app, onVolver = { navController.popBackStack() })
         }
 
         composable(Rutas.NUEVO_PRODUCTO) {
