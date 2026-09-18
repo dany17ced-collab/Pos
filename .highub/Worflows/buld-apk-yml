@@ -1,10 +1,11 @@
-name: Compilar APK Automático
+name: Compilar APK de Prueba
 
 on:
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -21,15 +22,6 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
-    - name: Crear archivo local.properties con secretos
-      run: |
-        echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" >> local.properties
-        echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> local.properties
-
-    - name: Decodificar keystore de firma
-      run: |
-        echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/release.keystore.jks
-
     - name: Validar o Generar Gradle Wrapper
       run: |
         if [ ! -f gradlew ]; then
@@ -38,16 +30,11 @@ jobs:
         fi
         chmod +x gradlew
 
-    - name: Compilar APK (Modo Release)
-      run: ./gradlew clean assembleRelease --no-build-cache --no-configuration-cache
-      env:
-        RELEASE_STORE_FILE: release.keystore.jks
-        RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
-        RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
-        RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+    - name: Compilar APK (Modo Debug)
+      run: ./gradlew clean assembleDebug --no-build-cache --no-configuration-cache
 
     - name: Guardar el archivo APK generado
       uses: actions/upload-artifact@v4
       with:
-        name: EcoPos-Release-APK
-        path: app/build/outputs/apk/release/app-release.apk
+        name: EcoPos-Debug-APK
+        path: app/build/outputs/apk/debug/app-debug.apk
