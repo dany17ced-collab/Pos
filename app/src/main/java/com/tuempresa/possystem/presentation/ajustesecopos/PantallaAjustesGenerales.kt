@@ -128,7 +128,7 @@ private fun SeccionTitulo(texto: String) {
         color = EcoPosColors.TextoBlanco,
         fontSize = 18.sp,
         fontWeight = FontWeight.ExtraBold,
-        modifier = Modifier.padding(horizontal = 20.dp, top = 20.dp, bottom = 8.dp)
+        modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 8.dp)
     )
 }
 
