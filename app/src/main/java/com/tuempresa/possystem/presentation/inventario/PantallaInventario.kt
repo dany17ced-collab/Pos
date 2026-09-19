@@ -96,7 +96,7 @@ fun PantallaInventario(
                 }
             } else {
                 LazyColumn(
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp, bottom = 88.dp),
+                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 88.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(productos, key = { it.id }) { producto ->
