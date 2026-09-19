@@ -88,7 +88,7 @@ object LectorExcel {
             }
         }
 
-        crearParserSax().parse(InputSource(input), handler)
+        crearParserSax(handler).parse(InputSource(input))
         return resultado
     }
 
@@ -134,7 +134,7 @@ object LectorExcel {
             }
         }
 
-        crearParserSax().parse(InputSource(input), handler)
+        crearParserSax(handler).parse(InputSource(input))
 
         // Rellena huecos de columnas vacías para que cada fila tenga celdas contiguas.
         return filas.map { fila ->
@@ -145,7 +145,10 @@ object LectorExcel {
         }
     }
 
-    private fun crearParserSax() = SAXParserFactory.newInstance().newSAXParser().xmlReader
+    private fun crearParserSax(handler: DefaultHandler): org.xml.sax.XMLReader =
+        SAXParserFactory.newInstance().newSAXParser().xmlReader.apply {
+            contentHandler = handler
+        }
 
     /** "C7" -> 2 (columna índice 0-based); ignora el número de fila. */
     private fun referenciaAColumna(ref: String): Int {
