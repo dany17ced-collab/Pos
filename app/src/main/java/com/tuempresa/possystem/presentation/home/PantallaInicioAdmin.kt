@@ -49,6 +49,7 @@ fun PantallaInicioAdmin(
     app: POSApplication,
     onSeleccionarTienda: (String) -> Unit,
     onAgregarTienda: () -> Unit,
+    onNuevaVenta: () -> Unit,
     onVendedores: () -> Unit,
     onReportes: () -> Unit,
     onNavegarDestino: (EcoPosDestino) -> Unit
@@ -199,6 +200,14 @@ fun PantallaInicioAdmin(
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                BotonGestion(
+                    texto = "Vender",
+                    emoji = "🧾",
+                    colores = listOf(EcoPosColors.VerdeVivo, EcoPosColors.VerdeMenta),
+                    colorTexto = Color(0xFF0B2B1E),
+                    onClick = onNuevaVenta,
+                    modifier = Modifier.weight(1f)
+                )
                 BotonGestion(
                     texto = "Vendedores",
                     emoji = "👥",
