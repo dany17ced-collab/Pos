@@ -64,6 +64,12 @@ fun PantallaAjustes(
     onSeguridad: () -> Unit,
     onImpresora: () -> Unit,
     onCerrarSesion: () -> Unit,
+    onClientes: () -> Unit,
+    onDescuentos: () -> Unit,
+    onCambios: () -> Unit,
+    onUnidades: () -> Unit,
+    onEtiquetasPago: () -> Unit,
+    onAjustesGenerales: () -> Unit,
     onNavegarDestino: (EcoPosDestino) -> Unit
 ) {
     val usuario by app.sessionManager.usuarioActual.collectAsState()
@@ -212,6 +218,12 @@ fun PantallaAjustes(
                     add(ItemMenuAjustes("🧾", "Comprobantes y boletas", onComprobantesYBoletas))
                     add(ItemMenuAjustes("📥", "Importar Excel", onImportarExcel))
                     add(ItemMenuAjustes("🎨", "Categorías y colores", onCategoriasYColores))
+                    add(ItemMenuAjustes("🧑‍🤝‍🧑", "Clientes", onClientes))
+                    add(ItemMenuAjustes("🏷️", "Descuentos", onDescuentos))
+                    add(ItemMenuAjustes("🔁", "Cambios y devoluciones", onCambios))
+                    add(ItemMenuAjustes("📏", "Unidades de medida", onUnidades))
+                    add(ItemMenuAjustes("💳", "Etiquetas de pago", onEtiquetasPago))
+                    add(ItemMenuAjustes("⚙️", "Ajustes generales", onAjustesGenerales))
                 }
                 add(ItemMenuAjustes("🖨️", "Impresora", onImpresora))
                 if (esAdmin) {
