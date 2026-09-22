@@ -215,6 +215,8 @@ fun GrafoNavegacionPrincipal(app: POSApplication) {
                 onBuscar = { /* la propia pantalla filtra local; buscar algo concreto navega a la lista */ },
                 onEscanear = { navController.navigate(if (esAdmin) Rutas.INVENTARIO else Rutas.INVENTARIO_CONSULTA) },
                 onCategoria = { navController.navigate(if (esAdmin) Rutas.INVENTARIO else Rutas.INVENTARIO_CONSULTA) },
+                onNuevoProducto = { navController.navigate(Rutas.NUEVO_PRODUCTO) },
+                onEntradaMercaderia = { navController.navigate(Rutas.ENTRADA_MERCADERIA) },
                 onNavegarDestino = { destino ->
                     when (destino) {
                         EcoPosDestino.VENDER -> navController.navigate(
