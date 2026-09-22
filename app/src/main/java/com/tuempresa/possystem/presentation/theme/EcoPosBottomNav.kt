@@ -19,13 +19,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-/** Los 5 destinos fijos de la barra inferior, igual que en Eco POS. */
+/** Los 5 destinos fijos de la barra inferior, igual que en Eco POS.
+ *  El destino VENDER se muestra como "Inicio" en la barra: lleva siempre
+ *  al resumen (home_admin / home_vendedor), no a la pantalla de venta. */
 enum class EcoPosDestino { VENDER, INVENTARIO, HISTORIAL, REPORTES, MENU }
 
 private data class ItemNav(val destino: EcoPosDestino, val emoji: String, val etiqueta: String)
 
 private fun itemsNav(esAdmin: Boolean) = listOf(
-    ItemNav(EcoPosDestino.VENDER, "🧾", "Vender"),
+    ItemNav(EcoPosDestino.VENDER, "🏠", "Inicio"),
     ItemNav(EcoPosDestino.INVENTARIO, "📦", "Inventario"),
     ItemNav(EcoPosDestino.HISTORIAL, "📄", "Historial"),
     ItemNav(EcoPosDestino.REPORTES, "📊", if (esAdmin) "Reportes" else "Caja"),
