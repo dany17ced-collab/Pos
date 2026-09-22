@@ -180,6 +180,12 @@ fun GrafoNavegacionPrincipal(app: POSApplication) {
                 onSeguridad = { navController.navigate(Rutas.USUARIOS) },
                 onImpresora = { navController.navigate(Rutas.AJUSTES_IMPRESORA) },
                 onCerrarSesion = { app.sessionManager.cerrarSesion() },
+                onClientes = { navController.navigate(Rutas.CLIENTES) },
+                onDescuentos = { navController.navigate(Rutas.DESCUENTOS) },
+                onCambios = { navController.navigate(Rutas.CAMBIOS) },
+                onUnidades = { navController.navigate(Rutas.UNIDADES) },
+                onEtiquetasPago = { navController.navigate(Rutas.ETIQUETAS_PAGO) },
+                onAjustesGenerales = { navController.navigate(Rutas.AJUSTES_GENERALES) },
                 onNavegarDestino = { destino ->
                     when (destino) {
                         EcoPosDestino.VENDER -> navController.navigate(Rutas.VENTA)
