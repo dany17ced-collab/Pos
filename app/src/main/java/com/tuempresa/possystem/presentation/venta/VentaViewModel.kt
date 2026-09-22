@@ -1,0 +1,551 @@
+package com.tuempresa.possystem.presentation.venta
+
+import android.net.Uri
+import androidx.core.content.FileProvider
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.tuempresa.possystem.POSApplication
+import com.tuempresa.possystem.data.local.dao.StockInsuficienteException
+import com.tuempresa.possystem.data.local.entity.ConfiguracionTiendaEntity
+import com.tuempresa.possystem.data.local.entity.DetalleVentaEntity
+import com.tuempresa.possystem.data.local.entity.EtiquetaPagoEntity
+import com.tuempresa.possystem.data.local.entity.MetodoPago
+import com.tuempresa.possystem.data.local.entity.ProductoEntity
+import com.tuempresa.possystem.data.local.entity.TipoComprobante
+import com.tuempresa.possystem.data.local.entity.VentaEntity
+import com.tuempresa.possystem.domain.boleta.DispositivoBluetooth
+import com.tuempresa.possystem.domain.boleta.GeneradorBoletaPdf
+import com.tuempresa.possystem.domain.boleta.GeneradorTicketEscPos
+import com.tuempresa.possystem.domain.boleta.ImpresoraTermicaBluetooth
+import com.tuempresa.possystem.domain.boleta.ResultadoImpresion
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.util.UUID
+
+/** Resultado de buscar productos por código de barras o texto. */
+sealed class ResultadoBusqueda {
+    object SinBuscar : ResultadoBusqueda()
+    object Buscando : ResultadoBusqueda()
+    object NoEncontrado : ResultadoBusqueda()
+    /** Varios productos coinciden con el texto (ej. "buso" -> franela, algodón, french terry). */
+    data class VariosResultados(val productos: List<ProductoEntity>) : ResultadoBusqueda()
+    /** Un producto específico ya elegido: se muestran sus variantes (talla/color). */
+    data class Encontrado(val padre: ProductoEntity?, val variantes: List<ProductoEntity>) : ResultadoBusqueda()
+}
+
+sealed class EstadoCobro {
+    object Inactivo : EstadoCobro()
+    object Procesando : EstadoCobro()
+    data class Exitoso(val ventaId: String, val folio: Long?) : EstadoCobro()
+    data class Error(val mensaje: String) : EstadoCobro()
+}
+
+/** Estado de las acciones sobre la boleta ya emitida: vista previa, compartir PDF o imprimir en la térmica. */
+sealed class EstadoBoleta {
+    object Inactivo : EstadoBoleta()
+    object CargandoVistaPrevia : EstadoBoleta()
+    data class VistaPreviaLista(val datos: DatosBoleta) : EstadoBoleta()
+    object GenerandoPdf : EstadoBoleta()
+    data class PdfListo(val uri: Uri) : EstadoBoleta()
+    object BuscandoImpresoras : EstadoBoleta()
+    data class ImpresorasEncontradas(val dispositivos: List<DispositivoBluetooth>) : EstadoBoleta()
+    object Imprimiendo : EstadoBoleta()
+    object ImpresionExitosa : EstadoBoleta()
+    data class Error(val mensaje: String) : EstadoBoleta()
+}
+
+/**
+ * Datos del cliente capturados opcionalmente antes de emitir el comprobante:
+ * DNI o nombre (siempre opcionales), y si eligió factura, su RUC y razón
+ * social (obligatorios solo en ese caso, validado en la UI antes de confirmar).
+ */
+data class DatosClienteCobro(
+    val tipoComprobante: TipoComprobante = TipoComprobante.BOLETA,
+    val documento: String? = null,
+    val nombre: String? = null,
+    val ruc: String? = null,
+    val razonSocial: String? = null
+)
+
+/** Datos ya resueltos de la boleta, listos para pintar la vista previa en pantalla. */
+data class DatosBoleta(
+    val venta: VentaEntity,
+    val detalles: List<DetalleVentaEntity>,
+    val configuracion: ConfiguracionTiendaEntity?
+)
+
+class VentaViewModel(private val app: POSApplication) : ViewModel() {
+
+    private val productoDao = app.database.productoDao()
+    private val ventaDao = app.database.ventaDao()
+    private val configuracionTiendaDao = app.database.configuracionTiendaDao()
+    private val etiquetaPagoDao = app.database.etiquetaPagoDao()
+    private val precioCalculator = app.precioCalculator
+    private val impresora = ImpresoraTermicaBluetooth(app)
+
+    /**
+     * Etiquetas de pago configurables (Efectivo, Yape, Transferencia...) que
+     * el cajero ve en el checkout, en vez del enum [MetodoPago] fijo. Cada
+     * etiqueta mapea a un MetodoPago base (ver [EtiquetaPagoEntity.metodoPagoBase])
+     * para que confirmarCobro() y los reportes existentes sigan funcionando
+     * exactamente igual, sin cambios en el modelo de ventas.
+     */
+    val etiquetasPago: StateFlow<List<EtiquetaPagoEntity>> = etiquetaPagoDao.observarTodas()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Traduce el string guardado en la etiqueta al enum real usado por el resto de la app. */
+    fun metodoPagoDeEtiqueta(etiqueta: EtiquetaPagoEntity): MetodoPago {
+        return MetodoPago.entries.find { it.name == etiqueta.metodoPagoBase } ?: MetodoPago.EFECTIVO
+    }
+
+    private val _resultadoBusqueda = MutableStateFlow<ResultadoBusqueda>(ResultadoBusqueda.SinBuscar)
+    val resultadoBusqueda: StateFlow<ResultadoBusqueda> = _resultadoBusqueda.asStateFlow()
+
+    private val _carrito = MutableStateFlow<List<LineaCarrito>>(emptyList())
+    val carrito: StateFlow<List<LineaCarrito>> = _carrito.asStateFlow()
+
+    private val _estadoCobro = MutableStateFlow<EstadoCobro>(EstadoCobro.Inactivo)
+    val estadoCobro: StateFlow<EstadoCobro> = _estadoCobro.asStateFlow()
+
+    private val _estadoBoleta = MutableStateFlow<EstadoBoleta>(EstadoBoleta.Inactivo)
+    val estadoBoleta: StateFlow<EstadoBoleta> = _estadoBoleta.asStateFlow()
+
+    fun calcularTotal(lineas: List<LineaCarrito>): Double = lineas.sumOf { it.subtotal }
+
+    /**
+     * Señal para la UI: cuando el escaneo agrega directo al carrito (código
+     * INDEPENDIENTE que identifica una variante exacta), se dispara este
+     * evento para que la pantalla pueda mostrar una confirmación breve
+     * ("Agregado: Talla M / Azul") en vez de abrir el selector de variante.
+     */
+    private val _ultimoAgregadoPorEscaneo = MutableStateFlow<ProductoEntity?>(null)
+    val ultimoAgregadoPorEscaneo: StateFlow<ProductoEntity?> = _ultimoAgregadoPorEscaneo.asStateFlow()
+    fun limpiarUltimoAgregadoPorEscaneo() { _ultimoAgregadoPorEscaneo.value = null }
+
+    /**
+     * Búsqueda por código de barras exacto (viene del escáner).
+     *
+     * Si el código pertenece a una variante con código INDEPENDIENTE (distinto
+     * al de sus hermanas del mismo padre — ver nota en ProductoDao), el
+     * escaneo identifica la combinación talla/color exacta: se agrega directo
+     * al carrito con cantidad 1 al precio "Unidad", sin mostrar el selector
+     * ("escaneo y subo"). Si el código es COMPARTIDO (todas las variantes del
+     * padre tienen el mismo código, o el producto no tiene variantes), se
+     * comporta como siempre: muestra el selector de talla/color.
+     */
+    fun buscarPorCodigoBarras(codigo: String) {
+        viewModelScope.launch {
+            _resultadoBusqueda.value = ResultadoBusqueda.Buscando
+            val tiendaId = app.sessionManager.tiendaActivaIdRequerida()
+            val producto = productoDao.buscarPorCodigoBarras(tiendaId, codigo)
+            if (producto == null) {
+                _resultadoBusqueda.value = ResultadoBusqueda.NoEncontrado
+                return@launch
+            }
+
+            val esVariante = producto.productoBaseId != null
+            if (esVariante) {
+                val hermanas = productoDao.observarVariantes(producto.productoBaseId!!).first()
+                val esCodigoIndependiente = hermanas.size > 1 &&
+                    hermanas.mapNotNull { it.codigoBarras }.distinct().size > 1
+                if (esCodigoIndependiente) {
+                    val cantidad = 1
+                    val precio = calcularPrecioSugerido(producto, cantidad)
+                    val etiqueta = obtenerEtiquetaEscalon(producto, cantidad)
+                    agregarAlCarrito(producto, cantidad, precio, etiqueta)
+                    _ultimoAgregadoPorEscaneo.value = producto
+                    _resultadoBusqueda.value = ResultadoBusqueda.SinBuscar
+                    return@launch
+                }
+            }
+
+            mostrarVariantesDe(producto)
+        }
+    }
+
+    /**
+     * Búsqueda manual por nombre o SKU. Si hay varios productos padre que coinciden
+     * (ej. "buso" -> franela, algodón, french terry), se muestran todos para elegir.
+     * Si solo hay uno, se pasa directo a mostrar sus variantes.
+     */
+    fun buscarPorTexto(texto: String) {
+        if (texto.isBlank()) {
+            _resultadoBusqueda.value = ResultadoBusqueda.SinBuscar
+            return
+        }
+        viewModelScope.launch {
+            _resultadoBusqueda.value = ResultadoBusqueda.Buscando
+            val tiendaId = app.sessionManager.tiendaActivaIdRequerida()
+
+            val porSku = productoDao.buscarPorSku(tiendaId, texto)
+            if (porSku != null) {
+                mostrarVariantesDe(porSku)
+                return@launch
+            }
+
+            val coincidencias = productoDao.buscar(tiendaId, texto).first()
+                .filter { it.productoBaseId == null }
+
+            when {
+                coincidencias.isEmpty() -> _resultadoBusqueda.value = ResultadoBusqueda.NoEncontrado
+                coincidencias.size == 1 -> mostrarVariantesDe(coincidencias.first())
+                else -> _resultadoBusqueda.value = ResultadoBusqueda.VariosResultados(coincidencias)
+            }
+        }
+    }
+
+    /** Se llama cuando el usuario elige un producto específico de la lista de VariosResultados. */
+    fun elegirProducto(producto: ProductoEntity) {
+        viewModelScope.launch {
+            _resultadoBusqueda.value = ResultadoBusqueda.Buscando
+            mostrarVariantesDe(producto)
+        }
+    }
+
+    private suspend fun mostrarVariantesDe(producto: ProductoEntity) {
+        val esVariante = producto.productoBaseId != null
+        val idPadre = if (esVariante) producto.productoBaseId!! else producto.id
+        val padre = if (esVariante) productoDao.obtenerPorId(idPadre) else producto
+
+        val variantes = productoDao.observarVariantes(idPadre).first()
+
+        _resultadoBusqueda.value = if (variantes.isEmpty()) {
+            // Producto simple, sin variantes de talla/color: se vende directo con su propio stock
+            ResultadoBusqueda.Encontrado(padre = null, variantes = listOf(producto))
+        } else {
+            ResultadoBusqueda.Encontrado(padre = padre, variantes = variantes)
+        }
+    }
+
+    fun limpiarBusqueda() {
+        _resultadoBusqueda.value = ResultadoBusqueda.SinBuscar
+    }
+
+    /** Calcula el precio sugerido por escalón para mostrarlo editable en la UI antes de agregar. */
+    suspend fun calcularPrecioSugerido(variante: ProductoEntity, cantidad: Int): Double {
+        return precioCalculator.calcularPrecioUnitario(variante, cantidad)
+    }
+
+    suspend fun obtenerEtiquetaEscalon(variante: ProductoEntity, cantidad: Int): String {
+        return precioCalculator.obtenerEtiquetaEscalon(variante, cantidad)
+    }
+
+    /**
+     * Agrega una variante al carrito con la cantidad y el PRECIO indicados explícitamente.
+     * El precio ya viene resuelto por la UI (que parte del escalón sugerido pero permite
+     * al vendedor sobrescribirlo manualmente antes de confirmar, ej. para un descuento puntual).
+     */
+    fun agregarAlCarrito(variante: ProductoEntity, cantidad: Int, precioUnitario: Double, etiquetaEscalon: String) {
+        if (cantidad <= 0 || precioUnitario < 0) return
+
+        val lineaExistente = _carrito.value.find { it.producto.id == variante.id }
+        if (lineaExistente != null) {
+            val nuevaCantidad = lineaExistente.cantidad + cantidad
+            _carrito.value = _carrito.value.map {
+                if (it.id == lineaExistente.id) {
+                    it.copy(cantidad = nuevaCantidad, precioUnitario = precioUnitario, etiquetaEscalon = etiquetaEscalon)
+                } else it
+            }
+        } else {
+            _carrito.value = _carrito.value + LineaCarrito(
+                id = UUID.randomUUID().toString(),
+                producto = variante,
+                cantidad = cantidad,
+                precioUnitario = precioUnitario,
+                etiquetaEscalon = etiquetaEscalon
+            )
+        }
+        limpiarBusqueda()
+    }
+
+    fun quitarDelCarrito(lineaId: String) {
+        _carrito.value = _carrito.value.filterNot { it.id == lineaId }
+    }
+
+    /**
+     * Agrega varias variantes al carrito de una sola vez (pedido mayorista:
+     * varias tallas/colores en una sola pasada). Cada línea trae su propia
+     * cantidad, precio y etiqueta de escalón, ya resueltos por la UI.
+     */
+    fun agregarVariasAlCarrito(lineas: List<LineaPendiente>) {
+        lineas.forEach { linea ->
+            agregarAlCarrito(linea.variante, linea.cantidad, linea.precioUnitario, linea.etiquetaEscalon)
+        }
+    }
+
+    data class LineaPendiente(
+        val variante: ProductoEntity,
+        val cantidad: Int,
+        val precioUnitario: Double,
+        val etiquetaEscalon: String
+    )
+
+    fun vaciarCarrito() {
+        _carrito.value = emptyList()
+    }
+
+    /**
+     * Confirma el cobro: arma la venta y sus detalles, y llama a la transacción atómica del DAO.
+     *
+     * [datosCliente] es opcional: DNI/nombre del cliente y, si se eligió factura,
+     * su RUC y razón social. Se capturan justo antes de emitir el comprobante.
+     */
+    fun confirmarCobro(
+        metodoPago: MetodoPago,
+        montoRecibido: Double?,
+        datosCliente: DatosClienteCobro = DatosClienteCobro()
+    ) {
+        val lineas = _carrito.value
+        if (lineas.isEmpty()) return
+
+        viewModelScope.launch {
+            _estadoCobro.value = EstadoCobro.Procesando
+            try {
+                val ventaId = UUID.randomUUID().toString()
+                val ahora = System.currentTimeMillis()
+                val subtotalGeneral = lineas.sumOf { it.subtotal }
+                val impuestosGeneral = lineas.sumOf {
+                    it.subtotal * (it.producto.impuestoPorcentaje / 100.0)
+                }
+                val totalGeneral = subtotalGeneral + impuestosGeneral
+                val cambio = if (metodoPago == MetodoPago.EFECTIVO && montoRecibido != null) {
+                    (montoRecibido - totalGeneral).coerceAtLeast(0.0)
+                } else null
+
+                val usuarioActual = app.sessionManager.usuarioActual.value
+                val tiendaId = app.sessionManager.tiendaActivaIdRequerida()
+
+                val venta = VentaEntity(
+                    id = ventaId,
+                    tiendaId = tiendaId,
+                    fecha = ahora,
+                    subtotal = subtotalGeneral,
+                    impuestos = impuestosGeneral,
+                    total = totalGeneral,
+                    metodoPago = metodoPago,
+                    montoRecibido = montoRecibido,
+                    cambio = cambio,
+                    cajaId = com.tuempresa.possystem.domain.cajaIdDeTienda(tiendaId),
+                    usuarioId = usuarioActual?.id,
+                    tipoComprobante = datosCliente.tipoComprobante,
+                    clienteDocumento = datosCliente.documento?.trim()?.takeIf { it.isNotEmpty() },
+                    clienteNombre = datosCliente.nombre?.trim()?.takeIf { it.isNotEmpty() },
+                    clienteRuc = datosCliente.ruc?.trim()?.takeIf { it.isNotEmpty() },
+                    clienteRazonSocial = datosCliente.razonSocial?.trim()?.takeIf { it.isNotEmpty() }
+                )
+
+                val detalles = lineas.map { linea ->
+                    DetalleVentaEntity(
+                        id = UUID.randomUUID().toString(),
+                        ventaId = ventaId,
+                        productoId = linea.producto.id,
+                        nombreProducto = nombreCompletoVariante(linea.producto),
+                        cantidad = linea.cantidad,
+                        precioUnitario = linea.precioUnitario,
+                        precioCompraUnitario = linea.producto.precioCompra,
+                        impuestoPorcentaje = linea.producto.impuestoPorcentaje,
+                        subtotal = linea.subtotal
+                    )
+                }
+
+                ventaDao.registrarVentaCompleta(venta, detalles)
+
+                _estadoCobro.value = EstadoCobro.Exitoso(ventaId, venta.folio)
+                vaciarCarrito()
+            } catch (e: StockInsuficienteException) {
+                _estadoCobro.value = EstadoCobro.Error(
+                    "Stock insuficiente para \"${e.nombreProducto}\": disponible ${e.stockDisponible}, solicitado ${e.cantidadSolicitada}"
+                )
+            } catch (e: Exception) {
+                _estadoCobro.value = EstadoCobro.Error("No se pudo completar la venta. Intenta de nuevo.")
+            }
+        }
+    }
+
+    fun reiniciarEstadoCobro() {
+        _estadoCobro.value = EstadoCobro.Inactivo
+    }
+
+    // ---- Boleta: vista previa, compartir PDF (A4) e imprimir en térmica (58mm) ----
+
+    /** Recupera la venta + detalles ya guardados y la configuración de tienda vigente. */
+    private suspend fun obtenerDatosBoleta(ventaId: String): DatosBoleta? {
+        val venta = ventaDao.obtenerPorId(ventaId) ?: return null
+        val detalles = ventaDao.obtenerDetallesDeVenta(ventaId)
+        val configuracion = configuracionTiendaDao.obtenerPorTienda(venta.tiendaId)
+        return DatosBoleta(venta, detalles, configuracion)
+    }
+
+    /**
+     * Carga los datos de la venta recién cobrada para mostrarlos como vista
+     * previa de la boleta ANTES de compartir o imprimir — así el vendedor
+     * puede verificar que todo esté correcto (productos, totales, logo, etc.)
+     * antes de emitirla de verdad.
+     */
+    fun cargarVistaPrevia(ventaId: String) {
+        viewModelScope.launch {
+            _estadoBoleta.value = EstadoBoleta.CargandoVistaPrevia
+            try {
+                val datos = obtenerDatosBoleta(ventaId)
+                if (datos == null) {
+                    _estadoBoleta.value = EstadoBoleta.Error("No se encontró la venta.")
+                    return@launch
+                }
+                _estadoBoleta.value = EstadoBoleta.VistaPreviaLista(datos)
+            } catch (e: Exception) {
+                _estadoBoleta.value = EstadoBoleta.Error("No se pudo cargar la vista previa de la boleta.")
+            }
+        }
+    }
+
+    /** Genera el PDF en tamaño A4 en caché y devuelve su Uri (vía FileProvider) lista para compartir. */
+    fun generarPdfParaCompartir(ventaId: String) {
+        viewModelScope.launch {
+            _estadoBoleta.value = EstadoBoleta.GenerandoPdf
+            try {
+                val datos = obtenerDatosBoleta(ventaId)
+                if (datos == null) {
+                    _estadoBoleta.value = EstadoBoleta.Error("No se encontró la venta.")
+                    return@launch
+                }
+                val (venta, detalles, configuracion) = datos
+
+                val uri = withContext(Dispatchers.IO) {
+                    val carpeta = File(app.cacheDir, "boletas").apply { mkdirs() }
+                    val folioTexto = venta.folio?.toString()?.padStart(6, '0') ?: "000000"
+                    val archivo = File(carpeta, "boleta_$folioTexto.pdf")
+                    GeneradorBoletaPdf.generar(archivo, configuracion, venta, detalles)
+                    FileProvider.getUriForFile(app, "${app.packageName}.fileprovider", archivo)
+                }
+                _estadoBoleta.value = EstadoBoleta.PdfListo(uri)
+            } catch (e: Exception) {
+                _estadoBoleta.value = EstadoBoleta.Error("No se pudo generar el PDF de la boleta.")
+            }
+        }
+    }
+
+    /** Busca impresoras Bluetooth cercanas (emparejadas y nuevas) para que el usuario elija una. */
+    fun buscarImpresoras() {
+        if (!impresora.bluetoothDisponible()) {
+            _estadoBoleta.value = EstadoBoleta.Error("Este dispositivo no tiene Bluetooth.")
+            return
+        }
+        if (!impresora.bluetoothActivado()) {
+            _estadoBoleta.value = EstadoBoleta.Error("Activa el Bluetooth para buscar la impresora.")
+            return
+        }
+        viewModelScope.launch {
+            _estadoBoleta.value = EstadoBoleta.BuscandoImpresoras
+            val encontrados = mutableListOf<DispositivoBluetooth>()
+            try {
+                withContext(Dispatchers.IO) {
+                    impresora.buscarDispositivos().collect { dispositivo ->
+                        if (encontrados.none { it.direccionMac == dispositivo.direccionMac }) {
+                            encontrados.add(dispositivo)
+                            _estadoBoleta.value = EstadoBoleta.ImpresorasEncontradas(encontrados.toList())
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                if (encontrados.isEmpty()) {
+                    _estadoBoleta.value = EstadoBoleta.Error("No se pudo buscar impresoras Bluetooth.")
+                }
+            }
+        }
+    }
+
+    fun detenerBusquedaImpresoras() {
+        impresora.detenerBusqueda()
+    }
+
+    /**
+     * Imprime la boleta en la impresora térmica elegida y, si se imprime con éxito,
+     * la recuerda como predeterminada en la configuración de tienda para la próxima vez.
+     */
+    fun imprimirEn(ventaId: String, dispositivo: DispositivoBluetooth) {
+        viewModelScope.launch {
+            _estadoBoleta.value = EstadoBoleta.Imprimiendo
+            try {
+                val datos = obtenerDatosBoleta(ventaId)
+                if (datos == null) {
+                    _estadoBoleta.value = EstadoBoleta.Error("No se encontró la venta.")
+                    return@launch
+                }
+                val (venta, detalles, configuracion) = datos
+                val ticket = GeneradorTicketEscPos.generar(configuracion, venta, detalles)
+
+                val resultado = withContext(Dispatchers.IO) {
+                    impresora.imprimir(dispositivo.direccionMac, ticket)
+                }
+
+                when (resultado) {
+                    is ResultadoImpresion.Exitoso -> {
+                        recordarImpresora(configuracion, dispositivo)
+                        _estadoBoleta.value = EstadoBoleta.ImpresionExitosa
+                    }
+                    is ResultadoImpresion.Error -> {
+                        _estadoBoleta.value = EstadoBoleta.Error(resultado.mensaje)
+                    }
+                }
+            } catch (e: Exception) {
+                _estadoBoleta.value = EstadoBoleta.Error("No se pudo imprimir la boleta.")
+            }
+        }
+    }
+
+    /** Reimprime directo con la última impresora recordada, sin pedir que la elija de nuevo. */
+    fun imprimirConUltimaImpresora(ventaId: String) {
+        viewModelScope.launch {
+            val configuracion = configuracionTiendaDao.obtenerPorTienda(app.sessionManager.tiendaActivaIdRequerida())
+            val mac = configuracion?.macImpresora
+            val nombre = configuracion?.nombreImpresora
+            if (mac == null) {
+                buscarImpresoras()
+                return@launch
+            }
+            imprimirEn(ventaId, DispositivoBluetooth(nombre ?: "Impresora", mac, yaEmparejado = true))
+        }
+    }
+
+    fun hayImpresoraRecordada(callback: (Boolean) -> Unit) {
+        viewModelScope.launch {
+            val configuracion = configuracionTiendaDao.obtenerPorTienda(app.sessionManager.tiendaActivaIdRequerida())
+            callback(configuracion?.macImpresora != null)
+        }
+    }
+
+    private suspend fun recordarImpresora(configuracionActual: ConfiguracionTiendaEntity?, dispositivo: DispositivoBluetooth) {
+        val base = configuracionActual
+            ?: ConfiguracionTiendaEntity(
+                id = java.util.UUID.randomUUID().toString(),
+                tiendaId = app.sessionManager.tiendaActivaIdRequerida()
+            )
+        configuracionTiendaDao.guardar(
+            base.copy(
+                macImpresora = dispositivo.direccionMac,
+                nombreImpresora = dispositivo.nombre,
+                actualizadoEn = System.currentTimeMillis()
+            )
+        )
+    }
+
+    fun reiniciarEstadoBoleta() {
+        _estadoBoleta.value = EstadoBoleta.Inactivo
+    }
+
+    private fun nombreCompletoVariante(producto: ProductoEntity): String {
+        val partes = listOfNotNull(
+            producto.talla?.let { "Talla $it" },
+            producto.color
+        )
+        return if (partes.isEmpty()) producto.nombre else "${producto.nombre} (${partes.joinToString(" / ")})"
+    }
+}
