@@ -464,6 +464,7 @@ private fun FilaAgregarColor(
                             val limpio = nuevo.filter { it.isDigit() }
                             onStockPorTallaCambio(stockPorTalla + (talla.talla to stockCaptura.copy(stockTexto = limpio)))
                         },
+                        placeholder = { Text("0", color = TextoCremaApagado) },
                         singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.width(90.dp).height(52.dp),
@@ -576,11 +577,13 @@ private fun CampoTexto(
 
 @Composable
 private fun camposTextoColores() = TextFieldDefaults.colors(
-    focusedContainerColor = FondoTarjeta,
-    unfocusedContainerColor = FondoTarjeta,
+    focusedContainerColor = EcoPosColors.FondoInput,
+    unfocusedContainerColor = EcoPosColors.FondoInput,
     focusedTextColor = TextoCrema,
     unfocusedTextColor = TextoCrema,
     focusedIndicatorColor = Color.Transparent,
     unfocusedIndicatorColor = Color.Transparent,
+    focusedPlaceholderColor = TextoCremaApagado,
+    unfocusedPlaceholderColor = TextoCremaApagado,
     cursorColor = AcentoRosa
 )

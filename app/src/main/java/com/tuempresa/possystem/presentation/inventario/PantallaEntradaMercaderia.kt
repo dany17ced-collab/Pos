@@ -704,11 +704,13 @@ private fun CampoTextoEntrada(
 
 @Composable
 private fun camposTextoColores() = TextFieldDefaults.colors(
-    focusedContainerColor = FondoTarjeta,
-    unfocusedContainerColor = FondoTarjeta,
+    focusedContainerColor = EcoPosColors.FondoInput,
+    unfocusedContainerColor = EcoPosColors.FondoInput,
     focusedTextColor = TextoCrema,
     unfocusedTextColor = TextoCrema,
     focusedIndicatorColor = Color.Transparent,
     unfocusedIndicatorColor = Color.Transparent,
+    focusedPlaceholderColor = TextoCremaApagado,
+    unfocusedPlaceholderColor = TextoCremaApagado,
     cursorColor = AcentoTerracota
 )

@@ -17,6 +17,12 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
@@ -24,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +70,8 @@ fun PantallaInventarioCategorias(
     onBuscar: (String) -> Unit,
     onEscanear: () -> Unit,
     onCategoria: (String) -> Unit,
+    onNuevoProducto: () -> Unit,
+    onEntradaMercaderia: () -> Unit,
     onNavegarDestino: (EcoPosDestino) -> Unit
 ) {
     val viewModel: InventarioResumenViewModel = viewModel(factory = fabricaViewModel(app) { InventarioResumenViewModel(app) })
@@ -72,11 +81,34 @@ fun PantallaInventarioCategorias(
     val tienda by app.sessionManager.tiendaActiva.collectAsState()
 
     var textoBusqueda by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
+    var menuFabAbierto by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { viewModel.cargar() }
 
     Scaffold(
         containerColor = EcoPosColors.FondoNegro,
+        floatingActionButton = {
+            if (esAdmin) {
+                Box {
+                    FloatingActionButton(
+                        onClick = { menuFabAbierto = true },
+                        containerColor = EcoPosColors.RosaVivo
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = "Añadir", tint = EcoPosColors.TextoBlanco)
+                    }
+                    DropdownMenu(expanded = menuFabAbierto, onDismissRequest = { menuFabAbierto = false }) {
+                        DropdownMenuItem(
+                            text = { Text("Nuevo producto") },
+                            onClick = { menuFabAbierto = false; onNuevoProducto() }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Entrada de mercadería") },
+                            onClick = { menuFabAbierto = false; onEntradaMercaderia() }
+                        )
+                    }
+                }
+            }
+        },
         bottomBar = {
             EcoPosBottomNav(seleccionado = EcoPosDestino.INVENTARIO, esAdmin = esAdmin, onSeleccionar = onNavegarDestino)
         }
