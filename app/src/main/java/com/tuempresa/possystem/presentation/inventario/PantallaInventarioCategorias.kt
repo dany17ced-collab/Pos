@@ -31,6 +31,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -80,7 +81,7 @@ fun PantallaInventarioCategorias(
     val resumenes by viewModel.resumenPorCategoria.collectAsState()
     val tienda by app.sessionManager.tiendaActiva.collectAsState()
 
-    var textoBusqueda by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf("") }
+    var textoBusqueda by remember { mutableStateOf("") }
     var menuFabAbierto by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) { viewModel.cargar() }
