@@ -154,6 +154,7 @@ fun GrafoNavegacionPrincipal(app: POSApplication) {
                     }
                 },
                 onAgregarTienda = { navController.navigate(Rutas.TIENDAS) },
+                onNuevaVenta = { navController.navigate(Rutas.VENTA) },
                 onVendedores = { navController.navigate(Rutas.USUARIOS) },
                 onReportes = { navController.navigate(Rutas.REPORTES) },
                 onNavegarDestino = { destino ->
@@ -188,7 +189,9 @@ fun GrafoNavegacionPrincipal(app: POSApplication) {
                 onAjustesGenerales = { navController.navigate(Rutas.AJUSTES_GENERALES) },
                 onNavegarDestino = { destino ->
                     when (destino) {
-                        EcoPosDestino.VENDER -> navController.navigate(Rutas.VENTA)
+                        EcoPosDestino.VENDER -> navController.navigate(
+                            if (esAdmin) Rutas.HOME_ADMIN else Rutas.HOME_VENDEDOR
+                        )
                         EcoPosDestino.INVENTARIO -> navController.navigate(Rutas.INVENTARIO_CATEGORIAS)
                         EcoPosDestino.HISTORIAL -> navController.navigate(Rutas.MIS_VENTAS)
                         EcoPosDestino.REPORTES -> navController.navigate(
@@ -214,7 +217,9 @@ fun GrafoNavegacionPrincipal(app: POSApplication) {
                 onCategoria = { navController.navigate(if (esAdmin) Rutas.INVENTARIO else Rutas.INVENTARIO_CONSULTA) },
                 onNavegarDestino = { destino ->
                     when (destino) {
-                        EcoPosDestino.VENDER -> navController.navigate(Rutas.VENTA)
+                        EcoPosDestino.VENDER -> navController.navigate(
+                            if (esAdmin) Rutas.HOME_ADMIN else Rutas.HOME_VENDEDOR
+                        )
                         EcoPosDestino.INVENTARIO -> { /* ya estamos aquí */ }
                         EcoPosDestino.HISTORIAL -> navController.navigate(Rutas.MIS_VENTAS)
                         EcoPosDestino.REPORTES -> navController.navigate(
