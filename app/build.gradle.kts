@@ -14,7 +14,9 @@ android {
         applicationId = "com.tuempresa.possystem"
         minSdk = 26 // Android 8.0 - necesario para Bluetooth SPP estable y CameraX
         targetSdk = 36
-        versionCode = 1
+        // El workflow de CI pasa VERSION_CODE (número de build de GitHub Actions),
+        // que siempre sube, así Android reconoce cada nueva APK como actualización.
+        versionCode = (project.findProperty("VERSION_CODE") as String?)?.toIntOrNull() ?: 1
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -27,7 +29,9 @@ android {
 
     signingConfigs {
         create("release") {
-            // Se completa en el paso de firmado (ver README > "Firma y build")
+            // Se completa en el paso de firmado (ver README > "Firma y build").
+            // El workflow de GitHub Actions pasa estos valores vía -P a partir
+            // de los secretos KEYSTORE_BASE64 / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD.
             val keystorePath = project.findProperty("RELEASE_STORE_FILE") as String?
             if (keystorePath != null) {
                 storeFile = file(keystorePath)
@@ -50,8 +54,11 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Descomenta cuando tengas el keystore configurado:
-            // signingConfig = signingConfigs.getByName("release")
+            // Firma con el keystore fijo cuando esté disponible (CI), para que
+            // cada APK instalada se reconozca como actualización de la anterior.
+            if (project.findProperty("RELEASE_STORE_FILE") != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
