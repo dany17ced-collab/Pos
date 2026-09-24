@@ -52,6 +52,7 @@ fun PantallaInicioAdmin(
     onNuevaVenta: () -> Unit,
     onVendedores: () -> Unit,
     onReportes: () -> Unit,
+    onMovimientos: () -> Unit,
     onNavegarDestino: (EcoPosDestino) -> Unit
 ) {
     val viewModel: HomeViewModel = viewModel(factory = fabricaViewModel(app) { HomeViewModel(app) })
@@ -85,13 +86,13 @@ fun PantallaInicioAdmin(
                     .padding(start = 16.dp, top = 12.dp, end = 16.dp)
                     .fillMaxWidth()
                     .clip(EcoPosShapes.TarjetaChica)
-                    .background(EcoPosColors.MoradoVivo.copy(alpha = 0.14f))
+                    .background(EcoPosColors.AzulCeleste.copy(alpha = 0.14f))
                     .padding(vertical = 8.dp, horizontal = 12.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     "MODO ADMINISTRADOR — todas las tiendas",
-                    color = EcoPosColors.MoradoVivo,
+                    color = EcoPosColors.AzulCeleste,
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -124,7 +125,7 @@ fun PantallaInicioAdmin(
                             .width(140.dp)
                             .clip(EcoPosShapes.Tarjeta)
                             .background(EcoPosColors.FondoTarjeta)
-                            .border(1.5.dp, EcoPosColors.FondoBorde, EcoPosShapes.Tarjeta)
+                            .border(1.5.dp, EcoPosColors.FondoTarjetaClara, EcoPosShapes.Tarjeta)
                             .clickable(onClick = onAgregarTienda)
                             .padding(12.dp)
                     ) {
@@ -141,13 +142,13 @@ fun PantallaInicioAdmin(
                 TarjetaStat(
                     valor = "S/ ${"%.0f".format(stats.ventasHoy)}",
                     etiqueta = "Ventas hoy (todas)",
-                    colorValor = EcoPosColors.VerdeVivo,
+                    colorValor = EcoPosColors.VerdeMenta,
                     modifier = Modifier.weight(1f)
                 )
                 TarjetaStat(
                     valor = "${stats.transaccionesHoy}",
                     etiqueta = "Transacciones",
-                    colorValor = EcoPosColors.AzulVivo,
+                    colorValor = EcoPosColors.AzulCeleste,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -158,13 +159,13 @@ fun PantallaInicioAdmin(
                 TarjetaStat(
                     valor = "${stats.productosStockBajo}",
                     etiqueta = "Stock bajo",
-                    colorValor = EcoPosColors.AmbarVivo,
+                    colorValor = EcoPosColors.AcentoAmbar,
                     modifier = Modifier.weight(1f)
                 )
                 TarjetaStat(
                     valor = "${stats.vendedoresActivosAhora}",
                     etiqueta = "Vendedores activos ahora",
-                    colorValor = EcoPosColors.RojoVivo,
+                    colorValor = EcoPosColors.RojoSalmon,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -175,13 +176,13 @@ fun PantallaInicioAdmin(
                         .fillMaxWidth()
                         .padding(start = 16.dp, top = 14.dp, end = 16.dp)
                         .clip(EcoPosShapes.TarjetaChica)
-                        .background(EcoPosColors.AmbarVivoOscuro.copy(alpha = 0.14f))
+                        .background(EcoPosColors.AcentoAmbar.copy(alpha = 0.14f))
                         .padding(vertical = 12.dp, horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         "⚠️ ${stats.productosStockBajo} productos con stock bajo entre tus ${tiendasResumen.size} tiendas",
-                        color = EcoPosColors.AmbarVivo,
+                        color = EcoPosColors.AcentoAmbar,
                         fontSize = 12.5.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -203,7 +204,7 @@ fun PantallaInicioAdmin(
                 BotonGestion(
                     texto = "Vender",
                     emoji = "🧾",
-                    colores = listOf(EcoPosColors.VerdeVivo, EcoPosColors.VerdeMenta),
+                    colores = listOf(EcoPosColors.VerdeMenta, EcoPosColors.VerdeMenta),
                     colorTexto = Color(0xFF0B2B1E),
                     onClick = onNuevaVenta,
                     modifier = Modifier.weight(1f)
@@ -211,7 +212,7 @@ fun PantallaInicioAdmin(
                 BotonGestion(
                     texto = "Vendedores",
                     emoji = "👥",
-                    colores = listOf(EcoPosColors.AzulVivo, EcoPosColors.AzulVivoOscuro),
+                    colores = listOf(EcoPosColors.AzulCeleste, EcoPosColors.AzulCeleste),
                     colorTexto = EcoPosColors.TextoBlanco,
                     onClick = onVendedores,
                     modifier = Modifier.weight(1f)
@@ -219,9 +220,23 @@ fun PantallaInicioAdmin(
                 BotonGestion(
                     texto = "Reportes",
                     emoji = "📊",
-                    colores = listOf(EcoPosColors.AmbarVivo, EcoPosColors.AmbarVivoOscuro),
+                    colores = listOf(EcoPosColors.AcentoAmbar, EcoPosColors.AcentoAmbar),
                     colorTexto = Color(0xFF21201C),
                     onClick = onReportes,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, top = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                BotonGestion(
+                    texto = "Movimientos",
+                    emoji = "📈",
+                    colores = listOf(EcoPosColors.AzulCeleste, EcoPosColors.AzulCeleste),
+                    colorTexto = EcoPosColors.TextoBlanco,
+                    onClick = onMovimientos,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -243,8 +258,8 @@ private fun TarjetaTiendaHome(
         modifier = Modifier
             .width(140.dp)
             .clip(EcoPosShapes.Tarjeta)
-            .background(if (esActiva) EcoPosColors.MoradoVivo.copy(alpha = 0.08f) else EcoPosColors.FondoTarjeta)
-            .border(1.5.dp, if (esActiva) EcoPosColors.MoradoVivo else EcoPosColors.FondoBorde, EcoPosShapes.Tarjeta)
+            .background(if (esActiva) EcoPosColors.AzulCeleste.copy(alpha = 0.08f) else EcoPosColors.FondoTarjeta)
+            .border(1.5.dp, if (esActiva) EcoPosColors.AzulCeleste else EcoPosColors.FondoTarjetaClara, EcoPosShapes.Tarjeta)
             .clickable(onClick = onClick)
             .padding(12.dp)
     ) {
@@ -257,7 +272,7 @@ private fun TarjetaTiendaHome(
         )
         Text(
             "S/ ${"%.0f".format(ventasHoy)} hoy",
-            color = EcoPosColors.VerdeVivo,
+            color = EcoPosColors.VerdeMenta,
             fontSize = 15.sp,
             fontWeight = FontWeight.ExtraBold,
             modifier = Modifier.padding(top = 6.dp)
