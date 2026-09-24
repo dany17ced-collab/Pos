@@ -34,6 +34,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -272,26 +273,28 @@ fun PantallaNuevoProducto(app: POSApplication, onVolver: () -> Unit, onGuardado:
                     if (marcada && tallaCaptura != null) {
                         Column(modifier = Modifier.padding(start = 40.dp, top = 4.dp)) {
                             tallaCaptura.escalones.forEach { escalon ->
-                                Row(
-                                    modifier = Modifier.padding(top = 6.dp).fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        "${escalon.etiqueta} (${escalon.cantidadMinima}+):",
-                                        color = TextoCremaApagado,
-                                        fontSize = 12.5.sp,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    TextField(
-                                        value = escalon.precioTexto,
-                                        onValueChange = { nuevo -> viewModel.actualizarPrecioEscalon(talla, escalon.etiqueta, nuevo) },
-                                        singleLine = true,
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                        placeholder = { Text("0.00") },
-                                        modifier = Modifier.padding(start = 8.dp).width(100.dp).height(52.dp),
-                                        colors = camposTextoColores(),
-                                        shape = RoundedCornerShape(10.dp)
-                                    )
+                                key(talla, escalon.etiqueta) {
+                                    Row(
+                                        modifier = Modifier.padding(top = 6.dp).fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            "${escalon.etiqueta} (${escalon.cantidadMinima}+):",
+                                            color = TextoCremaApagado,
+                                            fontSize = 12.5.sp,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        TextField(
+                                            value = escalon.precioTexto,
+                                            onValueChange = { nuevo -> viewModel.actualizarPrecioEscalon(talla, escalon.etiqueta, nuevo) },
+                                            singleLine = true,
+                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                            placeholder = { Text("0.00") },
+                                            modifier = Modifier.padding(start = 8.dp).width(100.dp).height(52.dp),
+                                            colors = camposTextoColores(),
+                                            shape = RoundedCornerShape(10.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -455,6 +458,7 @@ private fun FilaAgregarColor(
 
         tallasMarcadas.forEach { talla ->
             val stockCaptura = stockPorTalla[talla.talla] ?: StockTallaEnCaptura(talla.talla)
+            key(talla.talla) {
             Column(modifier = Modifier.padding(top = 10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Talla ${talla.talla} — stock:", color = TextoCremaApagado, fontSize = 13.sp, modifier = Modifier.weight(1f))
@@ -488,6 +492,7 @@ private fun FilaAgregarColor(
                         }
                     }
                 }
+            }
             }
         }
 
