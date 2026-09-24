@@ -2,7 +2,9 @@ package com.tuempresa.possystem.presentation.venta
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PorterDuff
@@ -62,41 +64,50 @@ private sealed class FormaRecuadro {
 }
 
 /**
- * Calcula, en coordenadas del sensor (sin rotar), el rectángulo que
- * corresponde al recuadro de encuadre mostrado en pantalla — para usarlo
- * como [android.graphics.Rect] en [android.media.Image.setCropRect] y que
- * ML Kit analice solo esa región del frame, sin decodificar el frame
- * completo a Bitmap.
+ * Recorta del frame de la cámara únicamente la región que corresponde al
+ * recuadro de encuadre mostrado en pantalla, para que ML Kit solo pueda leer
+ * lo que hay dentro de esa ventana — es indispensable cuando hay más de un
+ * QR o código de barras cerca (por ejemplo, dos QR juntos en una boleta): sin
+ * este recorte, el desenfoque visual no impide que el analizador vea y lea
+ * el código equivocado, porque el desenfoque solo se dibuja para el ojo, no
+ * se aplica al frame que se analiza.
  *
- * Reproduce el mismo mapeo que hace PreviewView con ScaleType.FILL_CENTER
- * (la imagen se agranda manteniendo proporción hasta cubrir la vista,
- * recortando el sobrante) para ubicar el recuadro en la imagen ya orientada
- * como se ve en pantalla, y usa android.graphics.Matrix (rotación estándar
- * de Android, no álgebra manual) para deshacer la rotación de vuelta a las
- * coordenadas nativas del sensor que espera setCropRect.
+ * Reproduce el mismo recorte por centro que hace PreviewView con
+ * ScaleType.FILL_CENTER, para que la región recortada del frame de análisis
+ * coincida con lo que el usuario ve dentro del recuadro en pantalla.
  */
-private fun recuadroEnCoordenadasDeSensor(
-    anchoSensor: Int,
-    altoSensor: Int,
+private fun recortarAlRecuadro(
+    bitmapCompleto: Bitmap,
     rotacionGrados: Int,
     forma: FormaRecuadro,
     anchoVistaPx: Int,
     altoVistaPx: Int,
     densidad: Float
-): android.graphics.Rect {
-    // Tamaño de la imagen ya orientada como se ve en pantalla (a 90°/270°
-    // el sensor entrega ancho y alto intercambiados respecto a la vista).
-    val anchoRotado = if (rotacionGrados == 90 || rotacionGrados == 270) altoSensor else anchoSensor
-    val altoRotado = if (rotacionGrados == 90 || rotacionGrados == 270) anchoSensor else altoSensor
-
-    if (anchoRotado == 0 || altoRotado == 0 || anchoVistaPx == 0 || altoVistaPx == 0) {
-        return android.graphics.Rect(0, 0, anchoSensor, altoSensor)
+): Bitmap {
+    // Primero se rota el bitmap del sensor a la orientación de pantalla,
+    // porque el recuadro está definido en coordenadas de pantalla.
+    val bitmapRotado = if (rotacionGrados != 0) {
+        val matriz = Matrix().apply { postRotate(rotacionGrados.toFloat()) }
+        Bitmap.createBitmap(bitmapCompleto, 0, 0, bitmapCompleto.width, bitmapCompleto.height, matriz, true)
+    } else {
+        bitmapCompleto
     }
 
-    val escala = maxOf(anchoVistaPx.toFloat() / anchoRotado, altoVistaPx.toFloat() / altoRotado)
-    val recorteXVista = (anchoRotado * escala - anchoVistaPx) / 2f
-    val recorteYVista = (altoRotado * escala - altoVistaPx) / 2f
+    val anchoImagen = bitmapRotado.width
+    val altoImagen = bitmapRotado.height
+    if (anchoImagen == 0 || altoImagen == 0 || anchoVistaPx == 0 || altoVistaPx == 0) return bitmapRotado
 
+    // FILL_CENTER: la imagen se escala (manteniendo proporción) hasta cubrir
+    // toda la vista, recortando el sobrante. Se calcula esa misma escala para
+    // saber a qué región del bitmap original corresponde el recuadro.
+    val escala = maxOf(anchoVistaPx.toFloat() / anchoImagen, altoVistaPx.toFloat() / altoImagen)
+    val anchoImagenEscalado = anchoImagen * escala
+    val altoImagenEscalado = altoImagen * escala
+    val recorteXVista = (anchoImagenEscalado - anchoVistaPx) / 2f
+    val recorteYVista = (altoImagenEscalado - altoVistaPx) / 2f
+
+    // Rectángulo del recuadro en coordenadas de la vista (mismo cálculo que
+    // usa VistaDesenfoqueConVentana.rutaAgujero para dibujarlo).
     val cxVista = anchoVistaPx / 2f
     val cyVista = altoVistaPx / 2f
     val (wVista, hVista) = when (forma) {
@@ -108,36 +119,22 @@ private fun recuadroEnCoordenadasDeSensor(
             (anchoVistaPx * forma.anchoFraccion) to (forma.altoDp.value * densidad)
         }
     }
+    val recuadroVista = android.graphics.RectF(
+        cxVista - wVista / 2f, cyVista - hVista / 2f,
+        cxVista + wVista / 2f, cyVista + hVista / 2f
+    )
 
-    fun aRotadoX(xVista: Float) = (xVista + recorteXVista) / escala
-    fun aRotadoY(yVista: Float) = (yVista + recorteYVista) / escala
+    // Se traduce ese rectángulo de coordenadas de vista a coordenadas del
+    // bitmap real (deshaciendo el center-crop y la escala de FILL_CENTER).
+    fun aBitmapX(xVista: Float) = ((xVista + recorteXVista) / escala)
+    fun aBitmapY(yVista: Float) = ((yVista + recorteYVista) / escala)
 
-    val leftRotado = aRotadoX(cxVista - wVista / 2f).coerceIn(0f, anchoRotado.toFloat())
-    val topRotado = aRotadoY(cyVista - hVista / 2f).coerceIn(0f, altoRotado.toFloat())
-    val rightRotado = aRotadoX(cxVista + wVista / 2f).coerceIn(0f, anchoRotado.toFloat())
-    val bottomRotado = aRotadoY(cyVista + hVista / 2f).coerceIn(0f, altoRotado.toFloat())
+    val left = aBitmapX(recuadroVista.left).toInt().coerceIn(0, anchoImagen - 1)
+    val top = aBitmapY(recuadroVista.top).toInt().coerceIn(0, altoImagen - 1)
+    val right = aBitmapX(recuadroVista.right).toInt().coerceIn(left + 1, anchoImagen)
+    val bottom = aBitmapY(recuadroVista.bottom).toInt().coerceIn(top + 1, altoImagen)
 
-    // Deshace la rotación con android.graphics.Matrix (rotación estándar de
-    // Android alrededor del centro de la imagen rotada, luego trasladada al
-    // origen de la imagen sin rotar) en vez de fórmulas manuales por caso,
-    // para no arriesgar un error de signo en 90/180/270 que sería silencioso.
-    val rectRotado = android.graphics.RectF(leftRotado, topRotado, rightRotado, bottomRotado)
-    val matriz = android.graphics.Matrix().apply {
-        postRotate(-rotacionGrados.toFloat(), anchoRotado / 2f, altoRotado / 2f)
-        // Tras rotar alrededor del centro de la imagen rotada, el resultado
-        // queda centrado en (anchoRotado/2, altoRotado/2); se traslada para
-        // que quede centrado en (anchoSensor/2, altoSensor/2), el sistema de
-        // coordenadas real del sensor.
-        postTranslate((anchoSensor - anchoRotado) / 2f, (altoSensor - altoRotado) / 2f)
-    }
-    val rectSensor = android.graphics.RectF()
-    matriz.mapRect(rectSensor, rectRotado)
-
-    val left = rectSensor.left.toInt().coerceIn(0, anchoSensor - 1)
-    val top = rectSensor.top.toInt().coerceIn(0, altoSensor - 1)
-    val right = rectSensor.right.toInt().coerceIn(left + 1, anchoSensor)
-    val bottom = rectSensor.bottom.toInt().coerceIn(top + 1, altoSensor)
-    return android.graphics.Rect(left, top, right, bottom)
+    return Bitmap.createBitmap(bitmapRotado, left, top, right - left, bottom - top)
 }
 
 /**
@@ -279,38 +276,6 @@ fun EscanerCodigoBarras(
         ModoEscaneo.CODIGO_BARRAS -> FormaRecuadro.Rectangulo(0.85f, 120.dp)
     }
 
-    // El scanner de ML Kit y el executor del análisis se crean una sola vez
-    // por composición de la pantalla (no en cada recomposición de `update`,
-    // como ocurría antes) y se liberan al salir, para no acumular hilos ni
-    // instancias del scanner cada vez que Compose recompone.
-    val opciones = remember(modo) {
-        when (modo) {
-            ModoEscaneo.QR -> BarcodeScannerOptions.Builder()
-                .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
-                .build()
-            ModoEscaneo.CODIGO_BARRAS -> BarcodeScannerOptions.Builder()
-                .setBarcodeFormats(
-                    Barcode.FORMAT_EAN_13,
-                    Barcode.FORMAT_EAN_8,
-                    Barcode.FORMAT_UPC_A,
-                    Barcode.FORMAT_UPC_E,
-                    Barcode.FORMAT_CODE_128,
-                    Barcode.FORMAT_CODE_39
-                )
-                .build()
-        }
-    }
-    val scanner = remember(opciones) { BarcodeScanning.getClient(opciones) }
-    val executor = remember { Executors.newSingleThreadExecutor() }
-    val densidad = context.resources.displayMetrics.density
-
-    androidx.compose.runtime.DisposableEffect(scanner, executor) {
-        onDispose {
-            scanner.close()
-            executor.shutdown()
-        }
-    }
-
     Box(modifier = modifier.background(Color.Black)) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
@@ -359,44 +324,54 @@ fun EscanerCodigoBarras(
                         it.setSurfaceProvider(previewView.surfaceProvider)
                     }
 
+                    val opciones = when (modo) {
+                        ModoEscaneo.QR -> BarcodeScannerOptions.Builder()
+                            .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
+                            .build()
+                        ModoEscaneo.CODIGO_BARRAS -> BarcodeScannerOptions.Builder()
+                            .setBarcodeFormats(
+                                Barcode.FORMAT_EAN_13,
+                                Barcode.FORMAT_EAN_8,
+                                Barcode.FORMAT_UPC_A,
+                                Barcode.FORMAT_UPC_E,
+                                Barcode.FORMAT_CODE_128,
+                                Barcode.FORMAT_CODE_39
+                            )
+                            .build()
+                    }
+                    val scanner = BarcodeScanning.getClient(opciones)
+                    val executor = Executors.newSingleThreadExecutor()
+                    val densidad = context.resources.displayMetrics.density
+
                     val analysis = ImageAnalysis.Builder()
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build()
 
                     analysis.setAnalyzer(executor) { imageProxy ->
-                        val mediaImage = imageProxy.image
-                        if (yaDetectado || mediaImage == null) {
+                        if (yaDetectado) {
                             imageProxy.close()
                             return@setAnalyzer
                         }
                         try {
                             val anchoVista = previewView.width
                             val altoVista = previewView.height
-                            val rotacion = imageProxy.imageInfo.rotationDegrees
-                            if (anchoVista > 0 && altoVista > 0) {
-                                // Limita la región que ML Kit analiza al recuadro
-                                // de encuadre en pantalla, mapeado a coordenadas
-                                // del sensor. setCropRect es la vía oficial de
-                                // CameraX para esto: acota el análisis sin pasar
-                                // por Bitmap, que era el costo alto por frame.
-                                imageProxy.setCropRect(
-                                    recuadroEnCoordenadasDeSensor(
-                                        anchoSensor = imageProxy.width,
-                                        altoSensor = imageProxy.height,
-                                        rotacionGrados = rotacion,
-                                        forma = forma,
-                                        anchoVistaPx = anchoVista,
-                                        altoVistaPx = altoVista,
-                                        densidad = densidad
-                                    )
+                            val bitmapCompleto = imageProxy.toBitmap()
+                            val bitmapRecortado = if (anchoVista > 0 && altoVista > 0) {
+                                recortarAlRecuadro(
+                                    bitmapCompleto = bitmapCompleto,
+                                    rotacionGrados = imageProxy.imageInfo.rotationDegrees,
+                                    forma = forma,
+                                    anchoVistaPx = anchoVista,
+                                    altoVistaPx = altoVista,
+                                    densidad = densidad
                                 )
+                            } else {
+                                bitmapCompleto
                             }
-                            // ML Kit lee el plano YUV directo del sensor, ya
-                            // acotado al cropRect de arriba: no se convierte a
-                            // Bitmap en ningún momento, que era el costo más
-                            // alto por frame (asignaba y procesaba una imagen
-                            // completa solo para leer una fracción de ella).
-                            val image = InputImage.fromMediaImage(mediaImage, rotacion)
+                            // El bitmap recortado ya está orientado correctamente
+                            // (recortarAlRecuadro rota antes de recortar), así que
+                            // se pasa con rotación 0.
+                            val image = InputImage.fromBitmap(bitmapRecortado, 0)
                             scanner.process(image)
                                 .addOnSuccessListener { codigos ->
                                     val valor = codigos.firstOrNull()?.rawValue
@@ -409,9 +384,9 @@ fun EscanerCodigoBarras(
                                     imageProxy.close()
                                 }
                         } catch (e: Exception) {
-                            // Frame descartable: si falla el análisis de este
-                            // frame puntual, simplemente se ignora y se sigue
-                            // con el siguiente.
+                            // Frame descartable: si falla la conversión o el
+                            // recorte de este frame puntual, simplemente se
+                            // ignora y se sigue con el siguiente.
                             imageProxy.close()
                         }
                     }

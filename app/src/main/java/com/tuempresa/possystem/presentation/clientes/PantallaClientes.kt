@@ -64,7 +64,7 @@ fun PantallaClientes(
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            CabeceraSimple(titulo = "Cliente", onVolver = onVolver)
+            CabeceraSimple(titulo = "Clientes", subtitulo = "Datos para boletas y seguimiento", onVolver = onVolver)
 
             if (clientes.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -185,24 +185,31 @@ fun PantallaAnadirCliente(
 }
 
 @Composable
-internal fun CabeceraSimple(titulo: String, onVolver: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().padding(20.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            Icons.Filled.ArrowBack,
-            contentDescription = "Volver",
-            tint = EcoPosColors.TextoBlanco,
-            modifier = Modifier.clickable(onClick = onVolver)
-        )
-        Text(
-            titulo,
-            color = EcoPosColors.TextoBlanco,
-            fontSize = 22.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(start = 20.dp)
-        )
+internal fun CabeceraSimple(titulo: String, subtitulo: String? = null, onVolver: () -> Unit) {
+    Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Filled.ArrowBack,
+                contentDescription = "Volver",
+                tint = EcoPosColors.TextoBlanco,
+                modifier = Modifier.clickable(onClick = onVolver)
+            )
+            Text(
+                titulo,
+                color = EcoPosColors.TextoBlanco,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(start = 20.dp)
+            )
+        }
+        if (subtitulo != null) {
+            Text(
+                subtitulo,
+                color = EcoPosColors.TextoGrisApagado,
+                fontSize = 12.5.sp,
+                modifier = Modifier.padding(start = 36.dp, top = 2.dp)
+            )
+        }
     }
 }
 

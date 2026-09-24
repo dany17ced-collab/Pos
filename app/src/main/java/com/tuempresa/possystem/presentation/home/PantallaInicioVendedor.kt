@@ -83,13 +83,13 @@ fun PantallaInicioVendedor(
                     .padding(start = 16.dp, top = 12.dp, end = 16.dp)
                     .fillMaxWidth()
                     .clip(EcoPosShapes.TarjetaChica)
-                    .background(EcoPosColors.AzulCeleste.copy(alpha = 0.14f))
+                    .background(EcoPosColors.AzulVivo.copy(alpha = 0.14f))
                     .padding(vertical = 8.dp, horizontal = 12.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     "MODO VENDEDOR — solo cobro y stock",
-                    color = EcoPosColors.AzulCeleste,
+                    color = EcoPosColors.AzulVivo,
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.Bold
                 )
@@ -100,7 +100,7 @@ fun PantallaInicioVendedor(
                     .padding(start = 16.dp, top = 16.dp, end = 16.dp)
                     .fillMaxWidth()
                     .clip(EcoPosShapes.Tarjeta)
-                    .background(Brush.linearGradient(listOf(EcoPosColors.RojoSalmon, EcoPosColors.RojoSalmon)))
+                    .background(Brush.linearGradient(listOf(EcoPosColors.RosaVivoClaro, EcoPosColors.RosaVivo)))
                     .clickable(onClick = onNuevaVenta)
                     .padding(22.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -117,13 +117,13 @@ fun PantallaInicioVendedor(
                 TarjetaStat(
                     valor = "S/ ${"%.0f".format(stats.ventasHoy)}",
                     etiqueta = "Vendido hoy",
-                    colorValor = EcoPosColors.VerdeMenta,
+                    colorValor = EcoPosColors.VerdeVivo,
                     modifier = Modifier.weight(1f)
                 )
                 TarjetaStat(
                     valor = "${stats.numeroVentasHoy}",
                     etiqueta = "Ventas hoy",
-                    colorValor = EcoPosColors.AcentoAmbar,
+                    colorValor = EcoPosColors.AmbarVivo,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -169,7 +169,7 @@ internal fun ChipTienda(nombre: String) {
             .padding(horizontal = 12.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(EcoPosColors.VerdeMentaOscuro))
+        Box(modifier = Modifier.size(7.dp).clip(CircleShape).background(EcoPosColors.VerdeVivoOscuro))
         Text(nombre, color = EcoPosColors.TextoBlanco, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 6.dp))
     }
 }
@@ -204,10 +204,10 @@ private fun emojiParaCategoria(nombre: String): String = when {
 }
 
 private val degradadosCategoria = listOf(
-    listOf(EcoPosColors.RojoSalmon, EcoPosColors.RojoSalmon),
-    listOf(EcoPosColors.AzulCeleste, EcoPosColors.AzulCeleste),
-    listOf(EcoPosColors.AcentoAmbar, EcoPosColors.AcentoAmbar),
-    listOf(EcoPosColors.VerdeMenta, EcoPosColors.VerdeMentaOscuro)
+    listOf(EcoPosColors.RosaVivoClaro, EcoPosColors.RosaVivo),
+    listOf(EcoPosColors.AzulVivo, EcoPosColors.AzulVivoOscuro),
+    listOf(EcoPosColors.AmbarVivo, EcoPosColors.AmbarVivoOscuro),
+    listOf(EcoPosColors.VerdeVivo, EcoPosColors.VerdeVivoOscuro)
 )
 private val textoOscuroCategoria = setOf(2, 3) // ámbar y verde necesitan texto oscuro para contraste, como en el mockup
 

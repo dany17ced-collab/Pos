@@ -61,6 +61,7 @@ fun PantallaAjustes(
     onComprobantesYBoletas: () -> Unit,
     onImportarExcel: () -> Unit,
     onCategoriasYColores: () -> Unit,
+    onSeguridad: () -> Unit,
     onImpresora: () -> Unit,
     onCerrarSesion: () -> Unit,
     onClientes: () -> Unit,
@@ -114,7 +115,7 @@ fun PantallaAjustes(
                         modifier = Modifier
                             .size(48.dp)
                             .clip(EcoPosShapes.TarjetaChica)
-                            .background(Brush.linearGradient(listOf(EcoPosColors.AzulCeleste, EcoPosColors.AzulCeleste))),
+                            .background(Brush.linearGradient(listOf(EcoPosColors.MoradoVivo, EcoPosColors.MoradoVivoOscuro))),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -128,7 +129,7 @@ fun PantallaAjustes(
                         Text(usuario?.nombre ?: "", color = EcoPosColors.TextoBlanco, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
                         Text(
                             if (esAdmin) "ADMINISTRADOR" else "VENDEDOR",
-                            color = EcoPosColors.AzulCeleste,
+                            color = EcoPosColors.MoradoVivo,
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(top = 2.dp)
@@ -155,7 +156,7 @@ fun PantallaAjustes(
                             .fillMaxWidth()
                             .clip(EcoPosShapes.TarjetaChica)
                             .background(EcoPosColors.FondoTarjeta)
-                            .border(1.5.dp, if (esActiva) EcoPosColors.VerdeMentaOscuro else EcoPosColors.FondoTarjetaClara, EcoPosShapes.TarjetaChica)
+                            .border(1.5.dp, if (esActiva) EcoPosColors.VerdeVivoOscuro else EcoPosColors.FondoBorde, EcoPosShapes.TarjetaChica)
                             .clickable(enabled = !esActiva) {
                                 coroutineScope.launch { app.sessionManager.establecerTiendaActiva(tienda) }
                             }
@@ -166,7 +167,7 @@ fun PantallaAjustes(
                             modifier = Modifier
                                 .size(8.dp)
                                 .clip(CircleShape)
-                                .background(if (esActiva) EcoPosColors.VerdeMentaOscuro else EcoPosColors.TextoGrisApagado.copy(alpha = 0.5f))
+                                .background(if (esActiva) EcoPosColors.VerdeVivoOscuro else EcoPosColors.TextoGrisApagado.copy(alpha = 0.5f))
                         )
                         Text(
                             tienda.nombre,
@@ -190,13 +191,13 @@ fun PantallaAjustes(
                             .padding(top = 4.dp)
                             .fillMaxWidth()
                             .clip(EcoPosShapes.TarjetaChica)
-                            .background(EcoPosColors.RojoSalmon.copy(alpha = 0.08f))
-                            .border(1.5.dp, EcoPosColors.RojoSalmon.copy(alpha = 0.4f), EcoPosShapes.TarjetaChica)
+                            .background(EcoPosColors.RosaVivo.copy(alpha = 0.08f))
+                            .border(1.5.dp, EcoPosColors.RosaVivo.copy(alpha = 0.4f), EcoPosShapes.TarjetaChica)
                             .clickable(onClick = onVerTodasLasTiendas)
                             .padding(vertical = 14.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text("+ Agregar nueva tienda", color = EcoPosColors.RojoSalmon, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Text("+ Agregar nueva tienda", color = EcoPosColors.RosaVivoClaro, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -219,16 +220,15 @@ fun PantallaAjustes(
                     add(ItemMenuAjustes("🎨", "Categorías y colores", onCategoriasYColores))
                     add(ItemMenuAjustes("🧑‍🤝‍🧑", "Clientes", onClientes))
                     add(ItemMenuAjustes("🏷️", "Descuentos", onDescuentos))
+                    add(ItemMenuAjustes("🔁", "Cambios y devoluciones", onCambios))
                     add(ItemMenuAjustes("📏", "Unidades de medida", onUnidades))
                     add(ItemMenuAjustes("💳", "Etiquetas de pago", onEtiquetasPago))
                     add(ItemMenuAjustes("⚙️", "Ajustes generales", onAjustesGenerales))
                 }
-                // Cambios y devoluciones: visible para admin y vendedor, ambos
-                // atienden al cliente en tienda y pueden necesitar registrar uno.
-                add(ItemMenuAjustes("🔁", "Cambios y devoluciones", onCambios))
                 add(ItemMenuAjustes("🖨️", "Impresora", onImpresora))
-                // "Seguridad" se quitó del menú: apuntaba a la misma pantalla
-                // que "Vendedores y permisos" (Rutas.USUARIOS), duplicando la opción.
+                if (esAdmin) {
+                    add(ItemMenuAjustes("🔒", "Seguridad", onSeguridad))
+                }
                 add(ItemMenuAjustes("🚪", "Cerrar sesión", onCerrarSesion))
             }
 

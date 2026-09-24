@@ -65,26 +65,15 @@ fun PantallaUsuarios(
 
     Surface(modifier = Modifier.fillMaxSize(), color = FondoCarbon) {
         Column(modifier = Modifier.fillMaxSize()) {
+            com.tuempresa.possystem.presentation.clientes.CabeceraSimple(
+                titulo = "Vendedores",
+                subtitulo = "Usuarios con acceso a esta cuenta",
+                onVolver = onVolver
+            )
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.End
             ) {
-                Text(
-                    text = "‹",
-                    color = TextoCrema,
-                    fontSize = 26.sp,
-                    modifier = Modifier.clickable(onClick = onVolver)
-                )
-                Text(
-                    text = "Usuarios",
-                    color = TextoCrema,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(start = 16.dp)
-                )
-                Spacer(modifier = Modifier.weight(1f))
                 FloatingActionButton(
                     onClick = {
                         usuarioEditar = null

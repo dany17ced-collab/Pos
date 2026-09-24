@@ -155,26 +155,11 @@ fun PantallaEntradaMercaderia(
                     .verticalScroll(rememberScrollState())
                     .padding(bottom = 32.dp)
             ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "‹",
-                        color = TextoCrema,
-                        fontSize = 26.sp,
-                        modifier = Modifier.clickable(onClick = onVolver)
-                    )
-                    Text(
-                        text = "Entrada de mercadería",
-                        color = TextoCrema,
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(start = 16.dp)
-                    )
-                }
+                com.tuempresa.possystem.presentation.clientes.CabeceraSimple(
+                    titulo = "Entrada de mercadería",
+                    subtitulo = "Registra stock nuevo de un producto existente",
+                    onVolver = onVolver
+                )
 
                 val estado = estadoBusqueda
                 when (estado) {
@@ -719,11 +704,13 @@ private fun CampoTextoEntrada(
 
 @Composable
 private fun camposTextoColores() = TextFieldDefaults.colors(
-    focusedContainerColor = FondoTarjeta,
-    unfocusedContainerColor = FondoTarjeta,
+    focusedContainerColor = EcoPosColors.FondoInput,
+    unfocusedContainerColor = EcoPosColors.FondoInput,
     focusedTextColor = TextoCrema,
     unfocusedTextColor = TextoCrema,
     focusedIndicatorColor = Color.Transparent,
     unfocusedIndicatorColor = Color.Transparent,
+    focusedPlaceholderColor = TextoCremaApagado,
+    unfocusedPlaceholderColor = TextoCremaApagado,
     cursorColor = AcentoTerracota
 )

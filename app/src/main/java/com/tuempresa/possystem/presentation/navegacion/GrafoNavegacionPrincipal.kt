@@ -37,7 +37,6 @@ import com.tuempresa.possystem.presentation.home.PantallaProximamente
 import com.tuempresa.possystem.presentation.theme.EcoPosDestino
 import com.tuempresa.possystem.presentation.login.LoginViewModel
 import com.tuempresa.possystem.presentation.login.PantallaLogin
-import com.tuempresa.possystem.presentation.movimientos.PantallaMovimientos
 import com.tuempresa.possystem.presentation.inventario.PantallaEditarPrecio
 import com.tuempresa.possystem.presentation.inventario.PantallaEntradaMercaderia
 import com.tuempresa.possystem.presentation.inventario.PantallaInventario
@@ -82,7 +81,6 @@ private object Rutas {
     const val CATEGORIAS_COLORES = "categorias_colores"
     const val NUEVO_CLIENTE = "nuevo_cliente"
     const val NUEVO_DESCUENTO = "nuevo_descuento"
-    const val MOVIMIENTOS = "movimientos"
 }
 
 @Composable
@@ -159,7 +157,6 @@ fun GrafoNavegacionPrincipal(app: POSApplication) {
                 onNuevaVenta = { navController.navigate(Rutas.VENTA) },
                 onVendedores = { navController.navigate(Rutas.USUARIOS) },
                 onReportes = { navController.navigate(Rutas.REPORTES) },
-                onMovimientos = { navController.navigate(Rutas.MOVIMIENTOS) },
                 onNavegarDestino = { destino ->
                     when (destino) {
                         EcoPosDestino.VENDER -> { /* ya estamos aquí */ }
@@ -181,6 +178,7 @@ fun GrafoNavegacionPrincipal(app: POSApplication) {
                 onComprobantesYBoletas = { navController.navigate(Rutas.AJUSTES_BOLETA) },
                 onImportarExcel = { navController.navigate(Rutas.IMPORTAR_PRODUCTOS) },
                 onCategoriasYColores = { navController.navigate(Rutas.CATEGORIAS_COLORES) },
+                onSeguridad = { navController.navigate(Rutas.USUARIOS) },
                 onImpresora = { navController.navigate(Rutas.AJUSTES_IMPRESORA) },
                 onCerrarSesion = { app.sessionManager.cerrarSesion() },
                 onClientes = { navController.navigate(Rutas.CLIENTES) },
@@ -273,10 +271,6 @@ fun GrafoNavegacionPrincipal(app: POSApplication) {
 
         composable(Rutas.CIERRE_CAJA) {
             PantallaCierreCaja(app = app, onVolver = { navController.popBackStack() })
-        }
-
-        composable(Rutas.MOVIMIENTOS) {
-            PantallaMovimientos(app = app, onVolver = { navController.popBackStack() })
         }
 
         composable(Rutas.USUARIOS) {

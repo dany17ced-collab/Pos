@@ -43,7 +43,7 @@ fun PantallaReporteConsolidado(app: POSApplication, onVolver: () -> Unit) {
 
     Scaffold(containerColor = EcoPosColors.FondoNegro) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            CabeceraSimple(titulo = "Reporte consolidado", onVolver = onVolver)
+            CabeceraSimple(titulo = "Reporte consolidado", subtitulo = "Ventas y stock de todas tus tiendas", onVolver = onVolver)
 
             Text(
                 "Ventas de hoy y stock bajo de todas tus tiendas activas.",

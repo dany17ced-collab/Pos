@@ -68,7 +68,7 @@ fun PantallaDescuentos(
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            CabeceraSimple(titulo = "Descuento", onVolver = onVolver)
+            CabeceraSimple(titulo = "Descuentos", subtitulo = "Tipos de descuento disponibles al vender", onVolver = onVolver)
 
             if (descuentos.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -146,8 +146,8 @@ fun PantallaAnadirDescuento(
             containerColor = EcoPosColors.FondoNegro,
             contentColor = EcoPosColors.TextoBlanco
         ) {
-            Tab(selected = tabSeleccionada == 0, onClick = { tabSeleccionada = 0 }, text = { Text("INFO") })
-            Tab(selected = tabSeleccionada == 1, onClick = { tabSeleccionada = 1 }, text = { Text("PRODUCTO") })
+            Tab(selected = tabSeleccionada == 0, onClick = { tabSeleccionada = 0 }, text = { Text("Info") })
+            Tab(selected = tabSeleccionada == 1, onClick = { tabSeleccionada = 1 }, text = { Text("Producto") })
         }
 
         Column(

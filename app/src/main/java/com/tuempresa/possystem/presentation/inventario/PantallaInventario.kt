@@ -84,7 +84,7 @@ fun PantallaInventario(
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            CabeceraSimple(titulo = "Inventario", onVolver = onVolver)
+            CabeceraSimple(titulo = "Inventario", subtitulo = "Gestión de productos y stock", onVolver = onVolver)
 
             if (productos.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

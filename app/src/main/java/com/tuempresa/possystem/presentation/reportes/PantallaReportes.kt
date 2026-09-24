@@ -93,24 +93,11 @@ fun PantallaReportes(
                 .verticalScroll(rememberScrollState())
                 .padding(bottom = 32.dp)
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(20.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "‹",
-                    color = TextoCrema,
-                    fontSize = 26.sp,
-                    modifier = Modifier.clickable(onClick = onVolver)
-                )
-                Text(
-                    text = "Reportes",
-                    color = TextoCrema,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(start = 16.dp)
-                )
-            }
+            com.tuempresa.possystem.presentation.clientes.CabeceraSimple(
+                titulo = "Reportes",
+                subtitulo = "Exporta tus ventas e inventario de esta tienda",
+                onVolver = onVolver
+            )
 
             Row(
                 modifier = Modifier
