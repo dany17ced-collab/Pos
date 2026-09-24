@@ -102,7 +102,8 @@ fun PantallaNuevoProducto(app: POSApplication, onVolver: () -> Unit, onGuardado:
         ActivityResultContracts.RequestPermission()
     ) { concedido -> if (concedido) mostrandoEscaner = true }
 
-    androidx.compose.runtime.LaunchedEffect(tallas.keys) {
+    val tallasMarcadasKey = remember(tallas.keys.toList().sorted()) { tallas.keys.toList().sorted() }
+    androidx.compose.runtime.LaunchedEffect(tallasMarcadasKey) {
         val tallasOrdenadas = viewModel.tallasMarcadasOrdenadas().map { it.talla }
         stockPorTallaNuevo = tallasOrdenadas.associateWith { t ->
             stockPorTallaNuevo[t] ?: StockTallaEnCaptura(talla = t)
@@ -148,7 +149,7 @@ fun PantallaNuevoProducto(app: POSApplication, onVolver: () -> Unit, onGuardado:
         }
 
         LazyColumn(
-            modifier = Modifier.fillMaxSize().imePadding(),
+            modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(bottom = 32.dp)
         ) {
             item {
