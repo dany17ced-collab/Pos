@@ -293,11 +293,7 @@ fun PantallaNuevoProducto(app: POSApplication, onVolver: () -> Unit, onGuardado:
                                             placeholder = { Text("0.00") },
                                             modifier = Modifier.padding(start = 8.dp).width(100.dp),
                                             colors = camposTextoColores(),
-                                            shape = RoundedCornerShape(10.dp),
-                                            textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp),
-                                            contentPadding = TextFieldDefaults.contentPaddingWithoutLabel(
-                                                top = 8.dp, bottom = 8.dp, start = 12.dp, end = 12.dp
-                                            )
+                                            shape = RoundedCornerShape(10.dp)
                                         )
                                     }
                                 }
@@ -478,11 +474,7 @@ private fun FilaAgregarColor(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.width(90.dp),
                         colors = camposTextoColores(),
-                        shape = RoundedCornerShape(10.dp),
-                        textStyle = androidx.compose.ui.text.TextStyle(fontSize = 14.sp),
-                        contentPadding = TextFieldDefaults.contentPaddingWithoutLabel(
-                            top = 8.dp, bottom = 8.dp, start = 12.dp, end = 12.dp
-                        )
+                        shape = RoundedCornerShape(10.dp)
                     )
                 }
                 if (modoCodigoBarras == ModoCodigoBarras.INDEPENDIENTE) {
