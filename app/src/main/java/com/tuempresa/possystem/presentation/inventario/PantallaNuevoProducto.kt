@@ -56,7 +56,7 @@ import com.tuempresa.possystem.presentation.venta.tienePermisoCamara
 
 private val FondoCarbon = EcoPosColors.FondoNegro
 private val FondoTarjeta = EcoPosColors.FondoTarjeta
-private val AcentoRosa = EcoPosColors.RosaVivo
+private val AcentoRosa = EcoPosColors.RojoSalmon
 private val TextoCrema = EcoPosColors.TextoBlanco
 private val TextoCremaApagado = EcoPosColors.TextoGrisApagado
 private val ColorError = EcoPosColors.ColorError
@@ -250,7 +250,7 @@ fun PantallaNuevoProducto(app: POSApplication, onVolver: () -> Unit, onGuardado:
                     modifier = Modifier.padding(start = 20.dp, bottom = 8.dp)
                 )
             }
-            items(TALLAS_DISPONIBLES) { talla ->
+            items(TALLAS_DISPONIBLES, key = { it }) { talla ->
                 val tallaCaptura = tallas[talla]
                 val marcada = tallaCaptura != null
                 Column(
