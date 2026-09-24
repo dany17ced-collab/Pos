@@ -148,7 +148,7 @@ fun PantallaNuevoProducto(app: POSApplication, onVolver: () -> Unit, onGuardado:
         }
 
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().imePadding(),
             contentPadding = PaddingValues(bottom = 32.dp)
         ) {
             item {
