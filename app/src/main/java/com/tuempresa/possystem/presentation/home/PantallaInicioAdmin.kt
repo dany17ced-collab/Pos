@@ -86,13 +86,13 @@ fun PantallaInicioAdmin(
                     .padding(start = 16.dp, top = 12.dp, end = 16.dp)
                     .fillMaxWidth()
                     .clip(EcoPosShapes.TarjetaChica)
-                    .background(EcoPosColors.AzulCeleste.copy(alpha = 0.14f))
+                    .background(EcoPosColors.MoradoVivo.copy(alpha = 0.14f))
                     .padding(vertical = 8.dp, horizontal = 12.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     "MODO ADMINISTRADOR — todas las tiendas",
-                    color = EcoPosColors.AzulCeleste,
+                    color = EcoPosColors.MoradoVivo,
                     fontSize = 11.5.sp,
                     fontWeight = FontWeight.Bold
                 )
