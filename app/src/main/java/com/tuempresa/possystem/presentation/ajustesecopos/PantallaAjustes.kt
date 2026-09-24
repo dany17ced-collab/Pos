@@ -128,7 +128,7 @@ fun PantallaAjustes(
                         Text(usuario?.nombre ?: "", color = EcoPosColors.TextoBlanco, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
                         Text(
                             if (esAdmin) "ADMINISTRADOR" else "VENDEDOR",
-                            color = EcoPosColors.AzulCeleste,
+                            color = if (esAdmin) EcoPosColors.MoradoVivo else EcoPosColors.AzulCeleste,
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(top = 2.dp)
