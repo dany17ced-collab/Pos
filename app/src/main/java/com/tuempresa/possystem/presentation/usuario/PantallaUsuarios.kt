@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
@@ -64,27 +65,26 @@ fun PantallaUsuarios(
     }
 
     Surface(modifier = Modifier.fillMaxSize(), color = FondoCarbon) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            com.tuempresa.possystem.presentation.clientes.CabeceraSimple(
-                titulo = "Vendedores",
-                subtitulo = "Usuarios con acceso a esta cuenta",
-                onVolver = onVolver
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.End
-            ) {
+        Scaffold(
+            containerColor = FondoCarbon,
+            floatingActionButton = {
                 FloatingActionButton(
                     onClick = {
                         usuarioEditar = null
                         mostrarDialogoUsuario = true
                     },
-                    containerColor = AcentoTerracota,
-                    modifier = Modifier.size(48.dp)
+                    containerColor = AcentoTerracota
                 ) {
-                    Text("+", fontSize = 24.sp, color = FondoCarbon)
+                    Icon(Icons.Filled.Add, contentDescription = "Agregar vendedor", tint = FondoCarbon)
                 }
             }
+        ) { padding ->
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
+            com.tuempresa.possystem.presentation.clientes.CabeceraSimple(
+                titulo = "Vendedores",
+                subtitulo = "Usuarios con acceso a esta cuenta",
+                onVolver = onVolver
+            )
 
             Column(modifier = Modifier.padding(horizontal = 20.dp)) {
                 TextField(
@@ -188,6 +188,7 @@ fun PantallaUsuarios(
                     }
                 }
             }
+        }
         }
     }
 
@@ -323,7 +324,7 @@ private fun TarjetaUsuario(
 @Composable
 private fun BadgeRol(rol: RolUsuario) {
     val (color, texto) = when (rol) {
-        RolUsuario.ADMIN -> Color(0xFFFF6B6B) to "Admin"
+        RolUsuario.ADMIN -> EcoPosColors.MoradoVivo to "Admin"
         RolUsuario.VENDEDOR -> AcentoTerracota to "Vendedor"
     }
 
