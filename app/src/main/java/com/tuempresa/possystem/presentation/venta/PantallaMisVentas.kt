@@ -77,11 +77,26 @@ fun PantallaMisVentas(
 
     Surface(modifier = Modifier.fillMaxSize(), color = FondoCarbon) {
         Column(modifier = Modifier.fillMaxSize()) {
-            com.tuempresa.possystem.presentation.clientes.CabeceraSimple(
-                titulo = "Mis ventas de hoy",
-                subtitulo = "Historial de tus transacciones del turno",
-                onVolver = onVolver
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "‹",
+                    color = TextoCrema,
+                    fontSize = 26.sp,
+                    modifier = Modifier.clickable(onClick = onVolver)
+                )
+                Text(
+                    text = "Mis ventas de hoy",
+                    color = TextoCrema,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(start = 16.dp)
+                )
+            }
 
             Row(
                 modifier = Modifier

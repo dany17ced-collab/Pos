@@ -119,11 +119,26 @@ fun PantallaCambios(app: POSApplication, onVolver: () -> Unit) {
                     .verticalScroll(rememberScrollState())
                     .padding(bottom = 32.dp)
             ) {
-                com.tuempresa.possystem.presentation.clientes.CabeceraSimple(
-                    titulo = "Cambios y devoluciones",
-                    subtitulo = "Escanea la boleta original o busca por folio",
-                    onVolver = onVolver
-                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "‹",
+                        color = TextoCrema,
+                        fontSize = 26.sp,
+                        modifier = Modifier.clickable(onClick = onVolver)
+                    )
+                    Text(
+                        text = "Cambios y devoluciones",
+                        color = TextoCrema,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(start = 16.dp)
+                    )
+                }
 
                 when (val estado = resultadoBusqueda) {
                     is ResultadoBusquedaVenta.Encontrada -> {

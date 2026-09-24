@@ -92,11 +92,24 @@ fun PantallaCierreCaja(app: POSApplication, onVolver: () -> Unit) {
                 .verticalScroll(rememberScrollState())
                 .padding(bottom = 32.dp)
         ) {
-            com.tuempresa.possystem.presentation.clientes.CabeceraSimple(
-                titulo = "Cierre de caja",
-                subtitulo = "Resumen del turno y cortes X/Z",
-                onVolver = onVolver
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "‹",
+                    color = TextoCrema,
+                    fontSize = 26.sp,
+                    modifier = Modifier.clickable(onClick = onVolver)
+                )
+                Text(
+                    text = "Cierre de caja",
+                    color = TextoCrema,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(start = 16.dp)
+                )
+            }
 
             TarjetaResumenTurno(resumen = resumenTurno, desde = fechaInicioTurno, fondoInicial = fondoInicialTurno)
 

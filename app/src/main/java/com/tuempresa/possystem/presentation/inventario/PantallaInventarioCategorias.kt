@@ -51,10 +51,10 @@ import com.tuempresa.possystem.presentation.theme.EcoPosShapes
 import com.tuempresa.possystem.presentation.theme.ecoPosCamposTextoColores
 
 private val degradadosCategoria = listOf(
-    listOf(EcoPosColors.RosaVivoClaro, EcoPosColors.RosaVivo),
-    listOf(EcoPosColors.AzulVivo, EcoPosColors.AzulVivoOscuro),
-    listOf(EcoPosColors.AmbarVivo, EcoPosColors.AmbarVivoOscuro),
-    listOf(EcoPosColors.VerdeVivo, EcoPosColors.VerdeVivoOscuro)
+    listOf(EcoPosColors.RojoSalmon, EcoPosColors.ColorError),
+    listOf(EcoPosColors.AzulCeleste, EcoPosColors.AzulCeleste),
+    listOf(EcoPosColors.AcentoAmbar, EcoPosColors.AmbarCategoria),
+    listOf(EcoPosColors.VerdeMenta, EcoPosColors.VerdeMentaOscuro)
 )
 private val textoOscuroCategoria = setOf(2, 3)
 
@@ -93,7 +93,7 @@ fun PantallaInventarioCategorias(
                 Box {
                     FloatingActionButton(
                         onClick = { menuFabAbierto = true },
-                        containerColor = EcoPosColors.RosaVivo
+                        containerColor = EcoPosColors.RojoSalmon
                     ) {
                         Icon(Icons.Filled.Add, contentDescription = "Añadir", tint = EcoPosColors.TextoBlanco)
                     }
@@ -147,7 +147,7 @@ fun PantallaInventarioCategorias(
                         .padding(start = 8.dp)
                         .size(52.dp)
                         .clip(EcoPosShapes.TarjetaChica)
-                        .background(EcoPosColors.RosaVivo)
+                        .background(EcoPosColors.RojoSalmon)
                         .clickable(onClick = onEscanear),
                     contentAlignment = Alignment.Center
                 ) {
@@ -161,12 +161,12 @@ fun PantallaInventarioCategorias(
                         .fillMaxWidth()
                         .padding(start = 16.dp, top = 12.dp, end = 16.dp)
                         .clip(EcoPosShapes.TarjetaChica)
-                        .background(EcoPosColors.AmbarVivoOscuro.copy(alpha = 0.14f))
+                        .background(EcoPosColors.AcentoAmbar.copy(alpha = 0.14f))
                         .padding(vertical = 12.dp, horizontal = 14.dp)
                 ) {
                     Text(
                         "⚠️ $stockBajo productos con stock bajo — revisar",
-                        color = EcoPosColors.AmbarVivo,
+                        color = EcoPosColors.AcentoAmbar,
                         fontSize = 12.5.sp,
                         fontWeight = FontWeight.Bold
                     )

@@ -27,7 +27,9 @@ android {
 
     signingConfigs {
         create("release") {
-            // Se completa en el paso de firmado (ver README > "Firma y build")
+            // Se completa vía -P (gradle.properties o parámetros -P en CI, ver
+            // .github/workflows/android-build.yml). Si no están presentes,
+            // simplemente no se aplica y el build de release queda sin firmar.
             val keystorePath = project.findProperty("RELEASE_STORE_FILE") as String?
             if (keystorePath != null) {
                 storeFile = file(keystorePath)
@@ -50,8 +52,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Descomenta cuando tengas el keystore configurado:
-            // signingConfig = signingConfigs.getByName("release")
+            // Firma release activada: usa el keystore inyectado por CI
+            // (o por tu local.properties si compilas localmente).
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 

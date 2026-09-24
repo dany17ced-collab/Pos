@@ -30,11 +30,21 @@ jobs:
         fi
         chmod +x gradlew
 
-    - name: Build with Gradle
-      run: ./gradlew clean assembleDebug --no-build-cache --no-configuration-cache
+    - name: Decode keystore
+      run: |
+        echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > release.keystore
+
+    - name: Build signed release APK
+      run: |
+        ./gradlew clean assembleRelease \
+          -PRELEASE_STORE_FILE=../release.keystore \
+          -PRELEASE_STORE_PASSWORD="${{ secrets.KEYSTORE_PASSWORD }}" \
+          -PRELEASE_KEY_ALIAS="${{ secrets.KEY_ALIAS }}" \
+          -PRELEASE_KEY_PASSWORD="${{ secrets.KEY_PASSWORD }}" \
+          --no-build-cache --no-configuration-cache
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: EcoPos-Debug-APK
-        path: '**/build/outputs/apk/debug/app-debug.apk'
+        name: EcoPos-Release-APK
+        path: '**/build/outputs/apk/release/app-release.apk'

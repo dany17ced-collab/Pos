@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -29,7 +28,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -103,7 +101,6 @@ fun PantallaVenta(app: POSApplication, onVolver: () -> Unit) {
     val carrito by viewModel.carrito.collectAsState()
     val estadoCobro by viewModel.estadoCobro.collectAsState()
     val ultimoAgregadoPorEscaneo by viewModel.ultimoAgregadoPorEscaneo.collectAsState()
-    val tiendaActiva by app.sessionManager.tiendaActiva.collectAsState()
 
     // Antes de dejar vender, se verifica si el turno actual ya tiene un fondo
     // inicial declarado. Si no lo tiene (primer ingreso del día, o justo
@@ -195,11 +192,7 @@ fun PantallaVenta(app: POSApplication, onVolver: () -> Unit) {
 
             else -> {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    EncabezadoVenta(
-                        nombreTienda = tiendaActiva?.nombre ?: "",
-                        cantidadProductos = carrito.sumOf { it.cantidad },
-                        onVolver = onVolver
-                    )
+                    EncabezadoVenta(onVolver = onVolver)
 
                     BarraBusqueda(
                         texto = textoBusqueda,
@@ -312,37 +305,26 @@ fun PantallaVenta(app: POSApplication, onVolver: () -> Unit) {
 }
 
 @Composable
-private fun EncabezadoVenta(nombreTienda: String, cantidadProductos: Int, onVolver: () -> Unit) {
+private fun EncabezadoVenta(onVolver: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(20.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = "Nueva venta",
-                color = TextoCrema,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.ExtraBold
-            )
-            Text(
-                text = "$nombreTienda · $cantidadProductos producto${if (cantidadProductos == 1) "" else "s"}",
-                color = TextoCremaApagado,
-                fontSize = 12.5.sp,
-                modifier = Modifier.padding(top = 2.dp)
-            )
-        }
-        Box(
-            modifier = Modifier
-                .size(36.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(FondoTarjeta)
-                .clickable(onClick = onVolver),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(text = "✕", color = TextoCrema, fontSize = 16.sp)
-        }
+        Text(
+            text = "‹",
+            color = TextoCrema,
+            fontSize = 26.sp,
+            modifier = Modifier.clickable(onClick = onVolver)
+        )
+        Text(
+            text = "Vender",
+            color = TextoCrema,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(start = 16.dp)
+        )
     }
 }
 
@@ -361,7 +343,7 @@ private fun BarraBusqueda(
         TextField(
             value = texto,
             onValueChange = onTextoCambiado,
-            placeholder = { Text("Agregar producto...", color = TextoCremaApagado) },
+            placeholder = { Text("Buscar por nombre o SKU", color = TextoCremaApagado) },
             singleLine = true,
             modifier = Modifier.weight(1f),
             colors = TextFieldDefaults.colors(
@@ -371,7 +353,7 @@ private fun BarraBusqueda(
                 unfocusedTextColor = TextoCrema,
                 focusedIndicatorColor = Color.Transparent,
                 unfocusedIndicatorColor = Color.Transparent,
-                cursorColor = EcoPosColors.RosaVivo
+                cursorColor = AcentoTerracota
             ),
             shape = RoundedCornerShape(12.dp)
         )
@@ -998,55 +980,45 @@ private fun CarritoLista(
         contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        itemsIndexed(lineas, key = { _, linea -> linea.id }) { indice, linea ->
-            LineaCarritoItem(linea = linea, indice = indice, onQuitar = { onQuitar(linea.id) })
+        items(lineas, key = { it.id }) { linea ->
+            LineaCarritoItem(linea = linea, onQuitar = { onQuitar(linea.id) })
         }
     }
 }
 
 @Composable
-private fun LineaCarritoItem(linea: LineaCarrito, indice: Int, onQuitar: () -> Unit) {
+private fun LineaCarritoItem(linea: LineaCarrito, onQuitar: () -> Unit) {
     val etiquetaVariante = listOfNotNull(linea.producto.talla, linea.producto.color).joinToString(" / ")
-    val colorFranja = listOf(EcoPosColors.RosaVivo, EcoPosColors.AzulVivo, EcoPosColors.AmbarVivo, EcoPosColors.VerdeVivo)[indice % 4]
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(FondoTarjeta)
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .width(4.dp)
-                .fillMaxHeight()
-                .background(colorFranja)
-        )
-        Row(
-            modifier = Modifier.weight(1f).padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(linea.producto.nombre, color = TextoCrema, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                val detalle = buildString {
-                    if (etiquetaVariante.isNotBlank()) append("$etiquetaVariante · ")
-                    append("${linea.cantidad} × S/ ${"%.2f".format(linea.precioUnitario)} (${linea.etiquetaEscalon})")
-                }
-                Text(detalle, color = TextoCremaApagado, fontSize = 12.sp)
+        Column(modifier = Modifier.weight(1f)) {
+            Text(linea.producto.nombre, color = TextoCrema, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            val detalle = buildString {
+                if (etiquetaVariante.isNotBlank()) append("$etiquetaVariante · ")
+                append("${linea.cantidad} × S/ ${"%.2f".format(linea.precioUnitario)} (${linea.etiquetaEscalon})")
             }
-            Text(
-                text = "S/ ${"%.2f".format(linea.subtotal)}",
-                color = TextoCrema,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "✕",
-                color = ColorError,
-                fontSize = 16.sp,
-                modifier = Modifier
-                    .padding(start = 14.dp)
-                    .clickable(onClick = onQuitar)
-            )
+            Text(detalle, color = TextoCremaApagado, fontSize = 12.sp)
         }
+        Text(
+            text = "S/ ${"%.2f".format(linea.subtotal)}",
+            color = AcentoTerracota,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.SemiBold
+        )
+        Text(
+            text = "✕",
+            color = ColorError,
+            fontSize = 16.sp,
+            modifier = Modifier
+                .padding(start = 14.dp)
+                .clickable(onClick = onQuitar)
+        )
     }
 }
 
@@ -1096,14 +1068,14 @@ private fun PieCarrito(total: Double, habilitado: Boolean, onCobrar: () -> Unit)
             onClick = onCobrar,
             enabled = habilitado,
             colors = ButtonDefaults.buttonColors(
-                containerColor = EcoPosColors.VerdeVivo,
+                containerColor = AcentoTerracota,
                 disabledContainerColor = FondoCarbon
             )
         ) {
             Text(
-                "Cobrar S/ ${"%.2f".format(total)}",
-                color = if (habilitado) androidx.compose.ui.graphics.Color(0xFF0C2118) else TextoCremaApagado,
-                fontWeight = FontWeight.ExtraBold,
+                "Cobrar",
+                color = if (habilitado) FondoCarbon else TextoCremaApagado,
+                fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
             )
         }

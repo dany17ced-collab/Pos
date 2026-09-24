@@ -74,7 +74,7 @@ fun PantallaTiendas(app: POSApplication, onVolver: () -> Unit) {
         }
     ) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            CabeceraSimple(titulo = "Tiendas", subtitulo = "Gestiona tus sucursales y cuál está activa", onVolver = onVolver)
+            CabeceraSimple(titulo = "Tiendas", onVolver = onVolver)
 
             Text(
                 "La tienda marcada como activa determina qué inventario, ventas y reportes ves en el resto de la app.",

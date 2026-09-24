@@ -60,11 +60,26 @@ fun PantallaInventarioConsulta(
 
     Surface(modifier = Modifier.fillMaxSize(), color = FondoCarbon) {
         Column(modifier = Modifier.fillMaxSize()) {
-            com.tuempresa.possystem.presentation.clientes.CabeceraSimple(
-                titulo = "Consultar inventario",
-                subtitulo = "Busca un producto por nombre o código",
-                onVolver = onVolver
-            )
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "‹",
+                    color = TextoCrema,
+                    fontSize = 26.sp,
+                    modifier = Modifier.clickable(onClick = onVolver)
+                )
+                Text(
+                    text = "Consultar inventario",
+                    color = TextoCrema,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(start = 16.dp)
+                )
+            }
 
             TextField(
                 value = textoBusqueda,

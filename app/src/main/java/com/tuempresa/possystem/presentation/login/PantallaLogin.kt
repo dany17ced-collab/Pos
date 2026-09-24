@@ -34,7 +34,7 @@ import com.tuempresa.possystem.presentation.theme.EcoPosColors
 // Fondo carbón cálido, acento terracota rosado (textil), dorado suave para éxito.
 private val FondoCarbon = EcoPosColors.FondoNegro
 private val FondoCarbonSuave = EcoPosColors.FondoTarjeta
-private val AcentoTerracota = EcoPosColors.RosaVivo
+private val AcentoTerracota = EcoPosColors.AcentoAmbar
 private val AcentoTerracotaSuave = EcoPosColors.FondoTarjetaClara
 private val TextoCrema = EcoPosColors.TextoBlanco
 private val TextoCremaApagado = EcoPosColors.TextoGrisApagado

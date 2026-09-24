@@ -85,15 +85,15 @@ fun PantallaImportarProductos(app: POSApplication, onVolver: () -> Unit) {
 
     Scaffold(containerColor = EcoPosColors.FondoNegro) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
-            CabeceraSimple(titulo = "Importar Productos", subtitulo = "Carga masiva desde un archivo Excel", onVolver = onVolver)
+            CabeceraSimple(titulo = "Importar Productos", onVolver = onVolver)
 
             TabRow(
                 selectedTabIndex = tabSeleccionada,
                 containerColor = EcoPosColors.FondoNegro,
                 contentColor = EcoPosColors.TextoBlanco
             ) {
-                Tab(selected = tabSeleccionada == 0, onClick = { tabSeleccionada = 0 }, text = { Text("Datos") })
-                Tab(selected = tabSeleccionada == 1, onClick = { tabSeleccionada = 1 }, text = { Text("Vista previa") })
+                Tab(selected = tabSeleccionada == 0, onClick = { tabSeleccionada = 0 }, text = { Text("DATOS") })
+                Tab(selected = tabSeleccionada == 1, onClick = { tabSeleccionada = 1 }, text = { Text("PRODUCTO") })
             }
 
             Box(modifier = Modifier.weight(1f)) {
@@ -178,7 +178,7 @@ private fun PestanaDatos(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(Icons.Filled.Folder, contentDescription = null, tint = EcoPosColors.FondoNegro, modifier = Modifier.height(16.dp))
-                Text("Buscar", color = EcoPosColors.FondoNegro, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 6.dp))
+                Text("BUSCAR", color = EcoPosColors.FondoNegro, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 6.dp))
             }
         }
 
@@ -190,7 +190,7 @@ private fun PestanaDatos(
                 .background(EcoPosColors.AmbarCategoria.copy(alpha = 0.25f))
                 .padding(20.dp)
         ) {
-            Text("Información", color = EcoPosColors.AmbarCategoria, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Text("INFORMACIÓN", color = EcoPosColors.AmbarCategoria, fontSize = 18.sp, fontWeight = FontWeight.Bold)
 
             BloqueInfo("Nombre", "El nombre es obligatorio y tiene una longitud máxima de 40 caracteres.")
             BloqueInfo("SKU", "Si proporciona SKU para su producto, debe ser único. Si se repite o está vacío, se genera uno automáticamente.")
@@ -313,7 +313,7 @@ private fun BotonImportar(estado: EstadoImportacion, onImportar: () -> Unit) {
         contentAlignment = Alignment.Center
     ) {
         Text(
-            "Importar productos",
+            "IMPORTAR",
             color = if (habilitado) EcoPosColors.FondoNegro else EcoPosColors.TextoGrisApagado,
             fontSize = 16.sp,
             fontWeight = FontWeight.Bold

@@ -77,7 +77,6 @@ fun PantallaCategoriasColores(app: POSApplication, onVolver: () -> Unit) {
         Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             CabeceraSimple(
                 titulo = "Categorías y colores",
-                subtitulo = "Organiza tus productos y su color en el grid de inventario",
                 onVolver = onVolver
             )
 
