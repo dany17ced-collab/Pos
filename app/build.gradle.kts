@@ -46,8 +46,12 @@ android {
             applicationIdSuffix = ".debug"
         }
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // Minify/R8 desactivado temporalmente: causaba fallos intermitentes
+            // de foco/click en los TextField de precio y stock por talla
+            // (ver reglas agregadas en proguard-rules.pro por si se reactiva
+            // más adelante). Costo: el APK pesa más, nada más.
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
