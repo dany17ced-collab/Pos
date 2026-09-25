@@ -146,35 +146,41 @@ abstract class VentaDao {
     }
 
     /**
-     * Anula una venta ya registrada: revierte el stock y marca la venta como ANULADA.
-     * También atómica, y también deja rastro en la bitácora de movimientos (DEVOLUCION).
+     * Anula una venta ya registrada: marca la venta como ANULADA y, si
+     * [reponerStock] es true, revierte el stock vendido (dejando rastro en la
+     * bitácora de movimientos como DEVOLUCION). Si es false, la venta queda
+     * anulada pero el stock no se toca — útil cuando la mercadería ya no
+     * puede regresar físicamente al inventario. Controlado por la preferencia
+     * "Devolver stock al anular" de Ajustes generales. También atómica.
      */
     @Transaction
-    open suspend fun anularVenta(ventaId: String, motivo: String) {
-        val detalles = obtenerDetallesDeVenta(ventaId)
+    open suspend fun anularVenta(ventaId: String, motivo: String, reponerStock: Boolean = true) {
         val ahora = System.currentTimeMillis()
-        val movimientos = mutableListOf<MovimientoInventarioEntity>()
 
-        for (detalle in detalles) {
-            val stockAntes = obtenerStockActual(detalle.productoId) ?: 0
-            incrementarStockInterno(detalle.productoId, detalle.cantidad, ahora)
-            movimientos.add(
-                MovimientoInventarioEntity(
-                    id = java.util.UUID.randomUUID().toString(),
-                    productoId = detalle.productoId,
-                    tipo = TipoMovimiento.DEVOLUCION,
-                    cantidad = detalle.cantidad,
-                    stockAnterior = stockAntes,
-                    stockNuevo = stockAntes + detalle.cantidad,
-                    referenciaId = ventaId,
-                    motivo = motivo,
-                    fecha = ahora
+        if (reponerStock) {
+            val detalles = obtenerDetallesDeVenta(ventaId)
+            val movimientos = mutableListOf<MovimientoInventarioEntity>()
+            for (detalle in detalles) {
+                val stockAntes = obtenerStockActual(detalle.productoId) ?: 0
+                incrementarStockInterno(detalle.productoId, detalle.cantidad, ahora)
+                movimientos.add(
+                    MovimientoInventarioEntity(
+                        id = java.util.UUID.randomUUID().toString(),
+                        productoId = detalle.productoId,
+                        tipo = TipoMovimiento.DEVOLUCION,
+                        cantidad = detalle.cantidad,
+                        stockAnterior = stockAntes,
+                        stockNuevo = stockAntes + detalle.cantidad,
+                        referenciaId = ventaId,
+                        motivo = motivo,
+                        fecha = ahora
+                    )
                 )
-            )
+            }
+            insertarMovimientos(movimientos)
         }
 
         marcarVentaAnulada(ventaId, motivo, ahora)
-        insertarMovimientos(movimientos)
     }
 
     @Query(
