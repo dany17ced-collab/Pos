@@ -11,20 +11,26 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachMoney
-import androidx.compose.material.icons.filled.Numbers
-import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -32,7 +38,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tuempresa.possystem.POSApplication
-import com.tuempresa.possystem.domain.OrdenCarro
 import com.tuempresa.possystem.presentation.clientes.CabeceraSimple
 import com.tuempresa.possystem.presentation.theme.EcoPosColors
 import com.tuempresa.possystem.presentation.theme.EcoPosShapes
@@ -41,15 +46,17 @@ import com.tuempresa.possystem.presentation.theme.EcoPosShapes
  * Ajustes generales — preferencias de esta terminal (no se sincronizan,
  * viven en SharedPreferences vía [com.tuempresa.possystem.domain.PreferenciasRepository]).
  *
- * Rediseño: se agrupan en tarjetas (mismo patrón visual que PantallaAjustes)
- * en vez de una lista plana sin separación, cada fila explica en una línea
- * qué efecto tiene, y se quitaron "Recibo", "Cálculo de tarifas" y "Número de
- * factura": no tenían ninguna acción ni valor detrás, eran filas muertas que
- * generaban confusión.
+ * Se muestran solo las opciones que realmente cambian el comportamiento de
+ * la app: "Ocultar anuladas del historial" filtra la lista de Mis ventas, y
+ * "Devolver stock al anular" controla si anular una venta repone inventario
+ * (ver MisVentasViewModel.anularVenta / VentaDao.anularVenta). Se quitaron
+ * "Mostrar decimales", "Orden de productos nuevos" y "Sonido al escaneo": no
+ * tenían ningún efecto real, eran controles muertos que confundían.
  */
 @Composable
 fun PantallaAjustesGenerales(app: POSApplication, onVolver: () -> Unit) {
     val preferencias by app.preferenciasRepository.preferencias.collectAsState()
+    var mostrandoConfirmacionRestaurar by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -68,47 +75,12 @@ fun PantallaAjustesGenerales(app: POSApplication, onVolver: () -> Unit) {
             modifier = Modifier.padding(horizontal = 20.dp)
         )
 
-        SeccionAjustes(titulo = "Moneda y precios") {
+        SeccionAjustes(titulo = "Moneda") {
             FilaAjusteValor(
                 icono = Icons.Filled.AttachMoney,
                 titulo = "Divisa",
                 descripcion = "Símbolo usado en toda la app",
                 valor = preferencias.divisa
-            )
-            FilaAjusteToggle(
-                icono = Icons.Filled.Numbers,
-                titulo = "Mostrar decimales",
-                descripcion = "Ej. S/ 25.00 en vez de S/ 25",
-                activo = preferencias.mostrarDecimales,
-                onCambiar = { app.preferenciasRepository.actualizarMostrarDecimales(it) }
-            )
-        }
-
-        SeccionAjustes(titulo = "Carrito de venta") {
-            FilaAjusteValor(
-                icono = Icons.Filled.RestartAlt,
-                titulo = "Orden de productos nuevos",
-                descripcion = if (preferencias.ordenCarro == OrdenCarro.NUEVO_ARRIBA) {
-                    "Se agregan arriba de la lista"
-                } else {
-                    "Se agregan abajo de la lista"
-                },
-                valor = "Cambiar",
-                onClick = {
-                    val nuevoOrden = if (preferencias.ordenCarro == OrdenCarro.NUEVO_ARRIBA) {
-                        OrdenCarro.NUEVO_ABAJO
-                    } else {
-                        OrdenCarro.NUEVO_ARRIBA
-                    }
-                    app.preferenciasRepository.actualizarOrdenCarro(nuevoOrden)
-                }
-            )
-            FilaAjusteToggle(
-                icono = Icons.Filled.QrCodeScanner,
-                titulo = "Sonido al escanear",
-                descripcion = "Pitido corto cada vez que se lee un código",
-                activo = preferencias.sonidoEscaneo,
-                onCambiar = { app.preferenciasRepository.actualizarSonidoEscaneo(it) }
             )
         }
 
@@ -128,6 +100,42 @@ fun PantallaAjustesGenerales(app: POSApplication, onVolver: () -> Unit) {
                 onCambiar = { app.preferenciasRepository.actualizarAnuladaRepondraStock(it) }
             )
         }
+
+        OutlinedButton(
+            onClick = { mostrandoConfirmacionRestaurar = true },
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = EcoPosColors.TextoGrisApagado),
+            modifier = Modifier
+                .padding(horizontal = 20.dp, vertical = 18.dp)
+                .fillMaxWidth()
+        ) {
+            Text("Restaurar valores por defecto")
+        }
+    }
+
+    if (mostrandoConfirmacionRestaurar) {
+        AlertDialog(
+            onDismissRequest = { mostrandoConfirmacionRestaurar = false },
+            title = { Text("¿Restaurar valores por defecto?") },
+            text = {
+                Text(
+                    "Vuelve la divisa y las preferencias de ventas anuladas de esta terminal a su " +
+                        "configuración original. No afecta productos, ventas ni usuarios."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    app.preferenciasRepository.restaurarValoresPorDefecto()
+                    mostrandoConfirmacionRestaurar = false
+                }) {
+                    Text("Restaurar", color = EcoPosColors.RojoSalmon)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { mostrandoConfirmacionRestaurar = false }) {
+                    Text("Cancelar")
+                }
+            }
+        )
     }
 }
 
