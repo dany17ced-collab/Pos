@@ -31,7 +31,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -43,6 +45,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -279,15 +282,12 @@ fun PantallaNuevoProducto(app: POSApplication, onVolver: () -> Unit, onGuardado:
                                         fontSize = 12.5.sp,
                                         modifier = Modifier.weight(1f)
                                     )
-                                    TextField(
-                                        value = escalon.precioTexto,
-                                        onValueChange = { nuevo -> viewModel.actualizarPrecioEscalon(talla, escalon.etiqueta, nuevo) },
-                                        singleLine = true,
-                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                        placeholder = { Text("0.00") },
-                                        modifier = Modifier.padding(start = 8.dp).width(100.dp),
-                                        colors = camposTextoColores(),
-                                        shape = RoundedCornerShape(10.dp)
+                                    CampoPrecioEscalon(
+                                        clave = "$talla-${escalon.etiqueta}",
+                                        valorInicial = escalon.precioTexto,
+                                        onTextoCambiado = { nuevo -> viewModel.actualizarPrecioEscalon(talla, escalon.etiqueta, nuevo) },
+                                        colores = camposTextoColores(),
+                                        modifier = Modifier.padding(start = 8.dp)
                                     )
                                 }
                             }
@@ -451,18 +451,16 @@ private fun FilaAgregarColor(
             Column(modifier = Modifier.padding(top = 10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Talla ${talla.talla} — stock:", color = TextoCremaApagado, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                    TextField(
-                        value = stockCaptura.stockTexto,
-                        onValueChange = { nuevo ->
+                    CampoPrecioEscalon(
+                        clave = "stock-${talla.talla}",
+                        valorInicial = stockCaptura.stockTexto,
+                        onTextoCambiado = { nuevo ->
                             val limpio = nuevo.filter { it.isDigit() }
                             onStockPorTallaCambio(stockPorTalla + (talla.talla to stockCaptura.copy(stockTexto = limpio)))
                         },
-                        placeholder = { Text("0", color = TextoCremaApagado) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        modifier = Modifier.width(90.dp),
-                        colors = camposTextoColores(),
-                        shape = RoundedCornerShape(10.dp)
+                        colores = camposTextoColores(),
+                        ancho = 90.dp,
+                        tipoTeclado = KeyboardType.Number
                     )
                 }
                 if (modoCodigoBarras == ModoCodigoBarras.INDEPENDIENTE) {
