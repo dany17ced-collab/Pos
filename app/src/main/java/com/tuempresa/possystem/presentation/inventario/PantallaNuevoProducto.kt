@@ -5,6 +5,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -147,111 +148,106 @@ fun PantallaNuevoProducto(app: POSApplication, onVolver: () -> Unit, onGuardado:
             return@Surface
         }
 
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 32.dp)
+        val scrollState = androidx.compose.foundation.rememberScrollState()
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(scrollState)
+                .padding(bottom = 32.dp)
         ) {
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(20.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "‹ Cancelar",
-                        color = TextoCrema,
-                        fontSize = 16.sp,
-                        modifier = Modifier.clickable(onClick = onVolver)
-                    )
-                }
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Text(
-                    "Nuevo producto",
+                    text = "‹ Cancelar",
                     color = TextoCrema,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    modifier = Modifier.padding(start = 20.dp, bottom = 16.dp)
+                    fontSize = 16.sp,
+                    modifier = Modifier.clickable(onClick = onVolver)
                 )
             }
+            Text(
+                "Nuevo producto",
+                color = TextoCrema,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.ExtraBold,
+                modifier = Modifier.padding(start = 20.dp, bottom = 16.dp)
+            )
 
             // ---- Datos generales ----
-            item {
-                Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-                    CampoTexto(valor = nombre, onCambio = viewModel::actualizarNombre, placeholder = "Nombre del producto")
-                    Spacer(modifier = Modifier.height(10.dp))
-                    CampoTexto(valor = descripcion, onCambio = viewModel::actualizarDescripcion, placeholder = "Descripción / tipo de tela")
-                    Spacer(modifier = Modifier.height(10.dp))
-                    CampoTexto(
-                        valor = precioCompraTexto,
-                        onCambio = viewModel::actualizarPrecioCompra,
-                        placeholder = "Precio de compra",
-                        tipoTeclado = KeyboardType.Decimal
-                    )
+            Column(modifier = Modifier.padding(horizontal = 20.dp)) {
+                CampoTexto(valor = nombre, onCambio = viewModel::actualizarNombre, placeholder = "Nombre del producto")
+                Spacer(modifier = Modifier.height(10.dp))
+                CampoTexto(valor = descripcion, onCambio = viewModel::actualizarDescripcion, placeholder = "Descripción / tipo de tela")
+                Spacer(modifier = Modifier.height(10.dp))
+                CampoTexto(
+                    valor = precioCompraTexto,
+                    onCambio = viewModel::actualizarPrecioCompra,
+                    placeholder = "Precio de compra",
+                    tipoTeclado = KeyboardType.Decimal
+                )
 
-                    if (categorias.isNotEmpty()) {
-                        Text("Categoría", color = TextoCremaApagado, fontSize = 12.sp, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            categorias.forEach { categoria ->
-                                val seleccionada = categoriaId == categoria.id
-                                ChipSeleccionable(
-                                    texto = categoria.nombre,
-                                    seleccionada = seleccionada,
-                                    onClick = { viewModel.seleccionarCategoria(if (seleccionada) null else categoria.id) }
-                                )
-                            }
+                if (categorias.isNotEmpty()) {
+                    Text("Categoría", color = TextoCremaApagado, fontSize = 12.sp, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        categorias.forEach { categoria ->
+                            val seleccionada = categoriaId == categoria.id
+                            ChipSeleccionable(
+                                texto = categoria.nombre,
+                                seleccionada = seleccionada,
+                                onClick = { viewModel.seleccionarCategoria(if (seleccionada) null else categoria.id) }
+                            )
                         }
                     }
                 }
             }
 
             // ---- Código de barras: modo compartido vs independiente ----
-            item {
-                Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
-                    Text("Código de barras", color = TextoCremaApagado, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OpcionModoCodigoBarras(
-                            texto = "Uno solo para todo",
-                            seleccionada = modoCodigoBarras == ModoCodigoBarras.COMPARTIDO,
-                            onClick = { viewModel.seleccionarModoCodigoBarras(ModoCodigoBarras.COMPARTIDO) },
-                            modifier = Modifier.weight(1f)
-                        )
-                        OpcionModoCodigoBarras(
-                            texto = "Uno por cada talla/color",
-                            seleccionada = modoCodigoBarras == ModoCodigoBarras.INDEPENDIENTE,
-                            onClick = { viewModel.seleccionarModoCodigoBarras(ModoCodigoBarras.INDEPENDIENTE) },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                    if (modoCodigoBarras == ModoCodigoBarras.COMPARTIDO) {
-                        Row(modifier = Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(modifier = Modifier.weight(1f)) {
-                                CampoTexto(valor = codigoBarras, onCambio = viewModel::actualizarCodigoBarras, placeholder = "Código de barras")
-                            }
-                            BotonEscanear(modifier = Modifier.padding(start = 10.dp)) {
-                                if (tienePermisoCamara(context)) mostrandoEscaner = true
-                                else lanzadorPermiso.launch(Manifest.permission.CAMERA)
-                            }
+            Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 16.dp)) {
+                Text("Código de barras", color = TextoCremaApagado, fontSize = 12.sp, modifier = Modifier.padding(bottom = 6.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OpcionModoCodigoBarras(
+                        texto = "Uno solo para todo",
+                        seleccionada = modoCodigoBarras == ModoCodigoBarras.COMPARTIDO,
+                        onClick = { viewModel.seleccionarModoCodigoBarras(ModoCodigoBarras.COMPARTIDO) },
+                        modifier = Modifier.weight(1f)
+                    )
+                    OpcionModoCodigoBarras(
+                        texto = "Uno por cada talla/color",
+                        seleccionada = modoCodigoBarras == ModoCodigoBarras.INDEPENDIENTE,
+                        onClick = { viewModel.seleccionarModoCodigoBarras(ModoCodigoBarras.INDEPENDIENTE) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                if (modoCodigoBarras == ModoCodigoBarras.COMPARTIDO) {
+                    Row(modifier = Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Box(modifier = Modifier.weight(1f)) {
+                            CampoTexto(valor = codigoBarras, onCambio = viewModel::actualizarCodigoBarras, placeholder = "Código de barras")
                         }
-                    } else {
-                        Text(
-                            "Cada talla de cada color pedirá su propio código más abajo.",
-                            color = TextoCremaApagado,
-                            fontSize = 11.5.sp,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
+                        BotonEscanear(modifier = Modifier.padding(start = 10.dp)) {
+                            if (tienePermisoCamara(context)) mostrandoEscaner = true
+                            else lanzadorPermiso.launch(Manifest.permission.CAMERA)
+                        }
                     }
+                } else {
+                    Text(
+                        "Cada talla de cada color pedirá su propio código más abajo.",
+                        color = TextoCremaApagado,
+                        fontSize = 11.5.sp,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
                 }
             }
 
             // ---- Tallas y precios: checkbox que despliega el precio in-line ----
-            item {
-                Text(
-                    "Tallas y precio",
-                    color = TextoCrema,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(start = 20.dp, bottom = 8.dp)
-                )
-            }
-            items(TALLAS_DISPONIBLES, key = { it }) { talla ->
+            Text(
+                "Tallas y precio",
+                color = TextoCrema,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(start = 20.dp, bottom = 8.dp)
+            )
+            TALLAS_DISPONIBLES.forEach { talla ->
                 val tallaCaptura = tallas[talla]
                 val marcada = tallaCaptura != null
                 Column(
@@ -273,28 +269,26 @@ fun PantallaNuevoProducto(app: POSApplication, onVolver: () -> Unit, onGuardado:
                     if (marcada && tallaCaptura != null) {
                         Column(modifier = Modifier.padding(start = 40.dp, top = 4.dp)) {
                             tallaCaptura.escalones.forEach { escalon ->
-                                key(talla, escalon.etiqueta) {
-                                    Row(
-                                        modifier = Modifier.padding(top = 6.dp).fillMaxWidth(),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            "${escalon.etiqueta} (${escalon.cantidadMinima}+):",
-                                            color = TextoCremaApagado,
-                                            fontSize = 12.5.sp,
-                                            modifier = Modifier.weight(1f)
-                                        )
-                                        TextField(
-                                            value = escalon.precioTexto,
-                                            onValueChange = { nuevo -> viewModel.actualizarPrecioEscalon(talla, escalon.etiqueta, nuevo) },
-                                            singleLine = true,
-                                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                                            placeholder = { Text("0.00") },
-                                            modifier = Modifier.padding(start = 8.dp).width(100.dp),
-                                            colors = camposTextoColores(),
-                                            shape = RoundedCornerShape(10.dp)
-                                        )
-                                    }
+                                Row(
+                                    modifier = Modifier.padding(top = 6.dp).fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        "${escalon.etiqueta} (${escalon.cantidadMinima}+):",
+                                        color = TextoCremaApagado,
+                                        fontSize = 12.5.sp,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    TextField(
+                                        value = escalon.precioTexto,
+                                        onValueChange = { nuevo -> viewModel.actualizarPrecioEscalon(talla, escalon.etiqueta, nuevo) },
+                                        singleLine = true,
+                                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                        placeholder = { Text("0.00") },
+                                        modifier = Modifier.padding(start = 8.dp).width(100.dp),
+                                        colors = camposTextoColores(),
+                                        shape = RoundedCornerShape(10.dp)
+                                    )
                                 }
                             }
                         }
@@ -303,88 +297,84 @@ fun PantallaNuevoProducto(app: POSApplication, onVolver: () -> Unit, onGuardado:
             }
 
             // ---- Colores: lista + fila expandible para agregar uno nuevo ----
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(start = 20.dp, top = 18.dp, end = 20.dp, bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Colores", color = TextoCrema, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                    if (tallas.isNotEmpty() && !colorNuevoAbierto) {
-                        Text(
-                            "+ Agregar color",
-                            color = AcentoRosa,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.clickable { colorNuevoAbierto = true }
-                        )
-                    }
-                }
-                if (tallas.isEmpty()) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(start = 20.dp, top = 18.dp, end = 20.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Colores", color = TextoCrema, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                if (tallas.isNotEmpty() && !colorNuevoAbierto) {
                     Text(
-                        "Marca al menos una talla con su precio para poder agregar colores.",
-                        color = TextoCremaApagado,
-                        fontSize = 12.5.sp,
-                        modifier = Modifier.padding(horizontal = 20.dp)
+                        "+ Agregar color",
+                        color = AcentoRosa,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.clickable { colorNuevoAbierto = true }
                     )
                 }
             }
+            if (tallas.isEmpty()) {
+                Text(
+                    "Marca al menos una talla con su precio para poder agregar colores.",
+                    color = TextoCremaApagado,
+                    fontSize = 12.5.sp,
+                    modifier = Modifier.padding(horizontal = 20.dp)
+                )
+            }
 
-            items(colores, key = { it.id }) { colorCaptura ->
-                FilaColorGuardado(colorCaptura = colorCaptura, onQuitar = { viewModel.quitarColor(colorCaptura.id) })
+            colores.forEach { colorCaptura ->
+                key(colorCaptura.id) {
+                    FilaColorGuardado(colorCaptura = colorCaptura, onQuitar = { viewModel.quitarColor(colorCaptura.id) })
+                }
             }
 
             if (colorNuevoAbierto && tallas.isNotEmpty()) {
-                item {
-                    FilaAgregarColor(
-                        tallasMarcadas = viewModel.tallasMarcadasOrdenadas(),
-                        modoCodigoBarras = modoCodigoBarras,
-                        color = colorNombreNuevo,
-                        onColorCambio = { colorNombreNuevo = it },
-                        stockPorTalla = stockPorTallaNuevo,
-                        onStockPorTallaCambio = { stockPorTallaNuevo = it },
-                        coloresAgregados = coloresAgregadosSesion,
-                        onEscanearParaTalla = { callback ->
-                            callbackEscaneoTalla = callback
-                            if (tienePermisoCamara(context)) mostrandoEscaner = true
-                            else lanzadorPermiso.launch(Manifest.permission.CAMERA)
-                        },
-                        onGuardar = { color, stockPorTalla ->
-                            viewModel.agregarColor(color, stockPorTalla)
-                            coloresAgregadosSesion += 1
-                            colorNombreNuevo = ""
-                            stockPorTallaNuevo = viewModel.tallasMarcadasOrdenadas()
-                                .associate { it.talla to StockTallaEnCaptura(talla = it.talla) }
-                            // Se queda abierta y limpia para seguir agregando el
-                            // siguiente color sin volver a tocar "+ Agregar color".
-                        },
-                        onCerrar = { colorNuevoAbierto = false }
-                    )
-                }
+                FilaAgregarColor(
+                    tallasMarcadas = viewModel.tallasMarcadasOrdenadas(),
+                    modoCodigoBarras = modoCodigoBarras,
+                    color = colorNombreNuevo,
+                    onColorCambio = { colorNombreNuevo = it },
+                    stockPorTalla = stockPorTallaNuevo,
+                    onStockPorTallaCambio = { stockPorTallaNuevo = it },
+                    coloresAgregados = coloresAgregadosSesion,
+                    onEscanearParaTalla = { callback ->
+                        callbackEscaneoTalla = callback
+                        if (tienePermisoCamara(context)) mostrandoEscaner = true
+                        else lanzadorPermiso.launch(Manifest.permission.CAMERA)
+                    },
+                    onGuardar = { color, stockPorTalla ->
+                        viewModel.agregarColor(color, stockPorTalla)
+                        coloresAgregadosSesion += 1
+                        colorNombreNuevo = ""
+                        stockPorTallaNuevo = viewModel.tallasMarcadasOrdenadas()
+                            .associate { it.talla to StockTallaEnCaptura(talla = it.talla) }
+                        // Se queda abierta y limpia para seguir agregando el
+                        // siguiente color sin volver a tocar "+ Agregar color".
+                    },
+                    onCerrar = { colorNuevoAbierto = false }
+                )
             }
 
             // ---- Estado y botón guardar ----
-            item {
-                if (estadoGuardado is EstadoGuardado.Error) {
-                    Text(
-                        (estadoGuardado as EstadoGuardado.Error).mensaje,
-                        color = ColorError,
-                        fontSize = 13.sp,
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
-                    )
-                }
-                Button(
-                    onClick = { viewModel.guardarProducto() },
-                    enabled = estadoGuardado !is EstadoGuardado.Guardando,
-                    colors = ButtonDefaults.buttonColors(containerColor = AcentoRosa),
-                    modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 16.dp)
-                ) {
-                    Text(
-                        if (estadoGuardado is EstadoGuardado.Guardando) "Guardando..." else "Guardar producto",
-                        color = TextoCrema,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(vertical = 6.dp)
-                    )
-                }
+            if (estadoGuardado is EstadoGuardado.Error) {
+                Text(
+                    (estadoGuardado as EstadoGuardado.Error).mensaje,
+                    color = ColorError,
+                    fontSize = 13.sp,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+                )
+            }
+            Button(
+                onClick = { viewModel.guardarProducto() },
+                enabled = estadoGuardado !is EstadoGuardado.Guardando,
+                colors = ButtonDefaults.buttonColors(containerColor = AcentoRosa),
+                modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 16.dp)
+            ) {
+                Text(
+                    if (estadoGuardado is EstadoGuardado.Guardando) "Guardando..." else "Guardar producto",
+                    color = TextoCrema,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(vertical = 6.dp)
+                )
             }
         }
     }
@@ -458,7 +448,6 @@ private fun FilaAgregarColor(
 
         tallasMarcadas.forEach { talla ->
             val stockCaptura = stockPorTalla[talla.talla] ?: StockTallaEnCaptura(talla.talla)
-            key(talla.talla) {
             Column(modifier = Modifier.padding(top = 10.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Talla ${talla.talla} — stock:", color = TextoCremaApagado, fontSize = 13.sp, modifier = Modifier.weight(1f))
@@ -492,7 +481,6 @@ private fun FilaAgregarColor(
                         }
                     }
                 }
-            }
             }
         }
 
