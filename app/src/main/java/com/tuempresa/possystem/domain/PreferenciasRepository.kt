@@ -5,14 +5,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/** Cómo ordenar los productos recién agregados dentro del carrito de venta. */
-enum class OrdenCarro { NUEVO_ARRIBA, NUEVO_ABAJO }
-
 data class PreferenciasGenerales(
     val divisa: String = "PEN",
-    val mostrarDecimales: Boolean = true,
-    val ordenCarro: OrdenCarro = OrdenCarro.NUEVO_ARRIBA,
-    val sonidoEscaneo: Boolean = true,
     val ocultarTransaccionAnulada: Boolean = true,
     val anuladaRepondraStock: Boolean = true
 )
@@ -31,13 +25,6 @@ class PreferenciasRepository(context: Context) {
 
     private fun cargar(): PreferenciasGenerales = PreferenciasGenerales(
         divisa = prefs.getString(CLAVE_DIVISA, "PEN") ?: "PEN",
-        mostrarDecimales = prefs.getBoolean(CLAVE_DECIMALES, true),
-        ordenCarro = if (prefs.getBoolean(CLAVE_ORDEN_CARRO_ARRIBA, true)) {
-            OrdenCarro.NUEVO_ARRIBA
-        } else {
-            OrdenCarro.NUEVO_ABAJO
-        },
-        sonidoEscaneo = prefs.getBoolean(CLAVE_SONIDO_ESCANEO, true),
         ocultarTransaccionAnulada = prefs.getBoolean(CLAVE_OCULTAR_ANULADA, true),
         anuladaRepondraStock = prefs.getBoolean(CLAVE_ANULADA_REPONE_STOCK, true)
     )
@@ -45,21 +32,6 @@ class PreferenciasRepository(context: Context) {
     fun actualizarDivisa(valor: String) {
         prefs.edit().putString(CLAVE_DIVISA, valor).apply()
         _preferencias.value = _preferencias.value.copy(divisa = valor)
-    }
-
-    fun actualizarMostrarDecimales(valor: Boolean) {
-        prefs.edit().putBoolean(CLAVE_DECIMALES, valor).apply()
-        _preferencias.value = _preferencias.value.copy(mostrarDecimales = valor)
-    }
-
-    fun actualizarOrdenCarro(valor: OrdenCarro) {
-        prefs.edit().putBoolean(CLAVE_ORDEN_CARRO_ARRIBA, valor == OrdenCarro.NUEVO_ARRIBA).apply()
-        _preferencias.value = _preferencias.value.copy(ordenCarro = valor)
-    }
-
-    fun actualizarSonidoEscaneo(valor: Boolean) {
-        prefs.edit().putBoolean(CLAVE_SONIDO_ESCANEO, valor).apply()
-        _preferencias.value = _preferencias.value.copy(sonidoEscaneo = valor)
     }
 
     fun actualizarOcultarTransaccionAnulada(valor: Boolean) {
@@ -72,11 +44,15 @@ class PreferenciasRepository(context: Context) {
         _preferencias.value = _preferencias.value.copy(anuladaRepondraStock = valor)
     }
 
+    /** Vuelve las preferencias de esta terminal a sus valores de fábrica.
+     * No afecta productos, ventas, usuarios ni ninguna otra tabla del negocio. */
+    fun restaurarValoresPorDefecto() {
+        prefs.edit().clear().apply()
+        _preferencias.value = PreferenciasGenerales()
+    }
+
     companion object {
         private const val CLAVE_DIVISA = "divisa"
-        private const val CLAVE_DECIMALES = "mostrar_decimales"
-        private const val CLAVE_ORDEN_CARRO_ARRIBA = "orden_carro_arriba"
-        private const val CLAVE_SONIDO_ESCANEO = "sonido_escaneo"
         private const val CLAVE_OCULTAR_ANULADA = "ocultar_anulada"
         private const val CLAVE_ANULADA_REPONE_STOCK = "anulada_repone_stock"
     }
