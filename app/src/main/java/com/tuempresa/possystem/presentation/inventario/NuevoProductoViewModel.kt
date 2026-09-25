@@ -116,7 +116,7 @@ class NuevoProductoViewModel(private val app: POSApplication) : ViewModel() {
         if (_nombre.value.isBlank()) return "El nombre es obligatorio"
         if (_precioCompraTexto.value.toDoubleOrNull() == null) return "El precio de compra no es válido"
         if (_tallas.value.isEmpty()) return "Marca al menos una talla y define su precio"
-        for (tallaCaptura in _tallas.value.values) {
+        for (tallaCaptura in tallasMarcadasOrdenadas()) {
             val escalonUnidad = tallaCaptura.escalones.find { it.etiqueta == "Unidad" }
             if (escalonUnidad?.precioTexto?.toDoubleOrNull() == null) {
                 return "Falta el precio \"Unidad\" en talla ${tallaCaptura.talla}"
