@@ -46,6 +46,15 @@ android {
             applicationIdSuffix = ".debug"
         }
         release {
+            // PRUEBA DE DIAGNÓSTICO TEMPORAL: isDebuggable = true para
+            // descartar si el toque perdido en TextField es causado por
+            // protecciones de MIUI/Android que tratan distinto a las apps
+            // no-debuggables (release normal es debuggable=false). Si con
+            // esto el bug desaparece, confirma la causa y luego se revierte
+            // este flag a false (una app de producción real NUNCA debe
+            // quedar debuggable=true) buscando la protección específica de
+            // MIUI que lo cause, en vez de dejar esto puesto.
+            isDebuggable = true
             // Minify/R8 desactivado temporalmente: causaba fallos intermitentes
             // de foco/click en los TextField de precio y stock por talla
             // (ver reglas agregadas en proguard-rules.pro por si se reactiva
