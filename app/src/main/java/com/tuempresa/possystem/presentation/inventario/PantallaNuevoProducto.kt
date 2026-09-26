@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalFoundationApi::class)
+@file:OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 package com.tuempresa.possystem.presentation.inventario
 
 import android.Manifest
@@ -13,6 +13,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -185,7 +187,11 @@ fun PantallaNuevoProducto(app: POSApplication, onVolver: () -> Unit, onGuardado:
 
                 if (categorias.isNotEmpty()) {
                     Text("Categoría", color = TextoCremaApagado, fontSize = 12.sp, modifier = Modifier.padding(top = 14.dp, bottom = 6.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         categorias.forEach { categoria ->
                             val seleccionada = categoriaId == categoria.id
                             ChipSeleccionable(
