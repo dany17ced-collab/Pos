@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -222,6 +224,7 @@ private fun TarjetaCategoria(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DialogoCategoria(
     titulo: String,
@@ -266,7 +269,11 @@ private fun DialogoCategoria(
                 }
 
                 Text("Color", color = EcoPosColors.TextoGrisApagado, fontSize = 12.sp, modifier = Modifier.padding(top = 14.dp, bottom = 8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     COLORES_CATEGORIA_HEX.forEach { hex ->
                         val seleccionado = hex == colorSeleccionado
                         Box(
