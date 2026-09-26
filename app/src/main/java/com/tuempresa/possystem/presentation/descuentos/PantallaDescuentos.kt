@@ -9,10 +9,13 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
@@ -138,7 +141,12 @@ fun PantallaAnadirDescuento(
     var valorTexto by remember { mutableStateOf("") }
     var menuTipoAbierto by remember { mutableStateOf(false) }
 
-    Column(modifier = Modifier.fillMaxSize().background(EcoPosColors.FondoNegro)) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(EcoPosColors.FondoNegro)
+            .imePadding()
+    ) {
         CabeceraModal(titulo = "Añadir Descuento", onCerrar = onVolver)
 
         TabRow(
@@ -154,7 +162,8 @@ fun PantallaAnadirDescuento(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp)
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 4.dp)
         ) {
             if (tabSeleccionada == 0) {
                 CampoEtiquetado(etiqueta = "Nombre", valor = nombre, onValorCambia = { nombre = it })
