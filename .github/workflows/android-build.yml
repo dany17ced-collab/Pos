@@ -33,15 +33,32 @@ jobs:
     - name: Decode keystore
       run: |
         echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > release.keystore
+        echo "--- Verificación del keystore decodificado ---"
+        ls -la release.keystore
+        echo "Ruta absoluta: $(pwd)/release.keystore"
+        file release.keystore || true
+        echo "--- Verificación de que los secrets no llegan vacíos (sin mostrar su valor) ---"
+        if [ -z "${{ secrets.KEYSTORE_PASSWORD }}" ]; then echo "KEYSTORE_PASSWORD ESTÁ VACÍO"; else echo "KEYSTORE_PASSWORD tiene contenido"; fi
+        if [ -z "${{ secrets.KEY_ALIAS }}" ]; then echo "KEY_ALIAS ESTÁ VACÍO"; else echo "KEY_ALIAS tiene contenido"; fi
+        if [ -z "${{ secrets.KEY_PASSWORD }}" ]; then echo "KEY_PASSWORD ESTÁ VACÍO"; else echo "KEY_PASSWORD tiene contenido"; fi
 
     - name: Build signed release APK
       run: |
         ./gradlew clean assembleRelease \
-          -PRELEASE_STORE_FILE=../release.keystore \
+          -PRELEASE_STORE_FILE="$(pwd)/release.keystore" \
           -PRELEASE_STORE_PASSWORD="${{ secrets.KEYSTORE_PASSWORD }}" \
           -PRELEASE_KEY_ALIAS="${{ secrets.KEY_ALIAS }}" \
           -PRELEASE_KEY_PASSWORD="${{ secrets.KEY_PASSWORD }}" \
-          --no-build-cache --no-configuration-cache
+          --no-build-cache --no-configuration-cache --info | tee build_log.txt
+        echo "--- Buscando confirmación de firma en el log ---"
+        grep -i "signingConfig\|validateSigningRelease\|packageRelease" build_log.txt || true
+
+    - name: Verificar firma del APK generado
+      run: |
+        APK_PATH=$(find . -name "app-release.apk" | head -1)
+        echo "APK encontrado en: $APK_PATH"
+        $ANDROID_HOME/build-tools/*/apksigner verify --print-certs "$APK_PATH" || echo "apksigner no disponible o falló -- revisar con keytool manualmente"
+        keytool -printcert -jarfile "$APK_PATH" || echo "ADVERTENCIA: el APK generado por CI no está firmado correctamente"
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
