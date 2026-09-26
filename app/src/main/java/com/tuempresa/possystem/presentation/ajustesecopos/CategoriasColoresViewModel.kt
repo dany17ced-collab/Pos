@@ -17,7 +17,13 @@ val COLORES_CATEGORIA_HEX = listOf(
     "#FFC93E", // Ámbar vivo
     "#3EFFB0", // Verde vivo
     "#B57BFF", // Morado vivo
-    "#FF6B8A"  // Rojo vivo
+    "#FF6B8A", // Rojo vivo
+    "#FF8C3E", // Naranja vivo
+    "#2EE6D6", // Turquesa vivo
+    "#FFEE58", // Amarillo vivo
+    "#7C4DFF", // Violeta intenso
+    "#4CD964", // Verde esmeralda
+    "#FF4D8D"  // Fucsia vivo
 )
 
 /**
