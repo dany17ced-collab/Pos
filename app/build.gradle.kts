@@ -69,26 +69,6 @@ android {
             // (o por tu local.properties si compilas localmente).
             signingConfig = signingConfigs.getByName("release")
         }
-        create("diagnostico") {
-            // BUILD TEMPORAL SOLO PARA AISLAR LA CAUSA: es una copia exacta
-            // de "debug" (mismos flags, mismo applicationIdSuffix para poder
-            // instalarla junto a las otras dos sin conflicto) pero FIRMADA
-            // con el keystore de release en vez de con el keystore de debug
-            // automático de Android Studio/CI.
-            //
-            // Si esta build (misma config que debug, pero firmada distinto)
-            // FALLA igual que "release" -> la causa es 100% la firma/el
-            // keystore, no ningún flag de build.
-            // Si esta build FUNCIONA bien (como debug) -> la firma queda
-            // descartada del todo, y el o los flags que le quedan a
-            // "release" y no tiene esta build (minify ya en false,
-            // isDebuggable ya en true... o sea NINGUNO distinto salvo la
-            // firma) confirmarían aun más que es la firma.
-            initWith(getByName("debug"))
-            applicationIdSuffix = ".diagnostico"
-            signingConfig = signingConfigs.getByName("release")
-            matchingFallbacks += listOf("debug")
-        }
     }
 
     compileOptions {
