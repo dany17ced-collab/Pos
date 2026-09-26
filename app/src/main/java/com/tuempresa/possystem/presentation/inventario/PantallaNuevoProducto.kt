@@ -5,21 +5,21 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -31,7 +31,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -39,24 +38,27 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.tuempresa.possystem.POSApplication
-import com.tuempresa.possystem.data.local.entity.CategoriaEntity
 import com.tuempresa.possystem.presentation.theme.EcoPosColors
 import com.tuempresa.possystem.presentation.theme.EcoPosShapes
 import com.tuempresa.possystem.presentation.venta.EscanerCodigoBarras
 import com.tuempresa.possystem.presentation.venta.tienePermisoCamara
+import kotlinx.coroutines.launch
 
 private val FondoCarbon = EcoPosColors.FondoNegro
 private val FondoTarjeta = EcoPosColors.FondoTarjeta
@@ -66,13 +68,6 @@ private val TextoCremaApagado = EcoPosColors.TextoGrisApagado
 private val ColorError = EcoPosColors.ColorError
 private val ColorExito = EcoPosColors.ColorExito
 
-/**
- * Alta de producto nuevo — UNA sola pantalla de scroll continuo, sin
- * pestañas: datos generales, modo de código de barras, tallas con su precio
- * (checkbox que despliega el campo de precio in-line), y colores como filas
- * expandibles con su stock y —si el modo es independiente— su propio código
- * de barras por talla. Todo visible y editable sin saltar de vista.
- */
 @Composable
 fun PantallaNuevoProducto(app: POSApplication, onVolver: () -> Unit, onGuardado: () -> Unit) {
     val viewModel: NuevoProductoViewModel = viewModel(factory = fabricaSimple { NuevoProductoViewModel(app) })
@@ -89,12 +84,7 @@ fun PantallaNuevoProducto(app: POSApplication, onVolver: () -> Unit, onGuardado:
     val estadoGuardado by viewModel.estadoGuardado.collectAsState()
 
     var mostrandoEscaner by remember { mutableStateOf(false) }
-    // Cuando el escáner se abre desde un campo de código por talla (modo
-    // INDEPENDIENTE, dentro de una fila de color), este callback recibe el
-    // código leído en vez de ir a viewModel.actualizarCodigoBarras.
     var callbackEscaneoTalla by remember { mutableStateOf<((String) -> Unit)?>(null) }
-    // Índice del color cuya fila está expandida para editar (null = ninguna,
-    // o se está creando uno nuevo con colorNuevoAbierto = true).
     var colorNuevoAbierto by remember { mutableStateOf(false) }
     var colorNombreNuevo by remember { mutableStateOf("") }
     var stockPorTallaNuevo by remember { mutableStateOf<Map<String, StockTallaEnCaptura>>(emptyMap()) }
@@ -106,7 +96,7 @@ fun PantallaNuevoProducto(app: POSApplication, onVolver: () -> Unit, onGuardado:
     ) { concedido -> if (concedido) mostrandoEscaner = true }
 
     val tallasMarcadasKey = remember(tallas.keys.toList().sorted()) { tallas.keys.toList().sorted() }
-    androidx.compose.runtime.LaunchedEffect(tallasMarcadasKey) {
+    LaunchedEffect(tallasMarcadasKey) {
         val tallasOrdenadas = viewModel.tallasMarcadasOrdenadas().map { it.talla }
         stockPorTallaNuevo = tallasOrdenadas.associateWith { t ->
             stockPorTallaNuevo[t] ?: StockTallaEnCaptura(talla = t)
@@ -156,6 +146,7 @@ fun PantallaNuevoProducto(app: POSApplication, onVolver: () -> Unit, onGuardado:
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
+                .imePadding() // <--- Solución 1: Evita saltos bruscos con el teclado
                 .padding(bottom = 32.dp)
         ) {
             Row(
@@ -272,8 +263,15 @@ fun PantallaNuevoProducto(app: POSApplication, onVolver: () -> Unit, onGuardado:
                     if (marcada && tallaCaptura != null) {
                         Column(modifier = Modifier.padding(start = 40.dp, top = 4.dp)) {
                             tallaCaptura.escalones.forEach { escalon ->
+                                // Solución 2: FocusRequester para el área táctil
+                                val focusRequester = remember { FocusRequester() }
+                                
                                 Row(
-                                    modifier = Modifier.padding(top = 6.dp).fillMaxWidth(),
+                                    modifier = Modifier
+                                        .padding(top = 6.dp)
+                                        .fillMaxWidth()
+                                        .clickable { focusRequester.requestFocus() } // Toda la fila es clickeable
+                                        .padding(vertical = 4.dp), // Más área de toque
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
@@ -287,7 +285,8 @@ fun PantallaNuevoProducto(app: POSApplication, onVolver: () -> Unit, onGuardado:
                                         valorInicial = escalon.precioTexto,
                                         onTextoCambiado = { nuevo -> viewModel.actualizarPrecioEscalon(talla, escalon.etiqueta, nuevo) },
                                         colores = camposTextoColores(),
-                                        modifier = Modifier.padding(start = 8.dp)
+                                        modifier = Modifier.padding(start = 8.dp),
+                                        focusRequester = focusRequester // Se pasa el FocusRequester
                                     )
                                 }
                             }
@@ -347,8 +346,6 @@ fun PantallaNuevoProducto(app: POSApplication, onVolver: () -> Unit, onGuardado:
                         colorNombreNuevo = ""
                         stockPorTallaNuevo = viewModel.tallasMarcadasOrdenadas()
                             .associate { it.talla to StockTallaEnCaptura(talla = it.talla) }
-                        // Se queda abierta y limpia para seguir agregando el
-                        // siguiente color sin volver a tocar "+ Agregar color".
                     },
                     onCerrar = { colorNuevoAbierto = false }
                 )
@@ -448,8 +445,17 @@ private fun FilaAgregarColor(
 
         tallasMarcadas.forEach { talla ->
             val stockCaptura = stockPorTalla[talla.talla] ?: StockTallaEnCaptura(talla.talla)
+            // SOLUCIÓN: FocusRequester para hacer toda la fila clickeable
+            val focusRequester = remember { FocusRequester() }
+
             Column(modifier = Modifier.padding(top = 10.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { focusRequester.requestFocus() } // Hace que toda la fila sea táctil
+                        .padding(vertical = 4.dp)
+                ) {
                     Text("Talla ${talla.talla} — stock:", color = TextoCremaApagado, fontSize = 13.sp, modifier = Modifier.weight(1f))
                     CampoPrecioEscalon(
                         clave = "stock-${talla.talla}",
@@ -460,7 +466,8 @@ private fun FilaAgregarColor(
                         },
                         colores = camposTextoColores(),
                         ancho = 90.dp,
-                        tipoTeclado = KeyboardType.Number
+                        tipoTeclado = KeyboardType.Number,
+                        focusRequester = focusRequester
                     )
                 }
                 if (modoCodigoBarras == ModoCodigoBarras.INDEPENDIENTE) {
@@ -547,6 +554,7 @@ private fun ChipSeleccionable(texto: String, seleccionada: Boolean, onClick: () 
     }
 }
 
+// SOLUCIÓN: Modificado para incluir BringIntoViewRequester
 @Composable
 private fun CampoTexto(
     valor: String,
@@ -554,14 +562,73 @@ private fun CampoTexto(
     placeholder: String,
     tipoTeclado: KeyboardType = KeyboardType.Text
 ) {
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
+
     TextField(
         value = valor,
         onValueChange = onCambio,
         placeholder = { Text(placeholder, color = TextoCremaApagado) },
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = tipoTeclado),
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .bringIntoViewRequester(bringIntoViewRequester)
+            .onFocusChanged { focusState ->
+                if (focusState.isFocused) {
+                    scope.launch {
+                        bringIntoViewRequester.bringIntoView()
+                    }
+                }
+            },
         colors = camposTextoColores(),
+        shape = EcoPosShapes.Campo
+    )
+}
+
+// SOLUCIÓN: Reemplaza tu antigua función CampoPrecioEscalon con esta
+@Composable
+private fun CampoPrecioEscalon(
+    clave: String,
+    valorInicial: String,
+    onTextoCambiado: (String) -> Unit,
+    colores: androidx.compose.material3.TextFieldColors,
+    modifier: Modifier = Modifier,
+    ancho: androidx.compose.ui.unit.Dp = 100.dp,
+    tipoTeclado: KeyboardType = KeyboardType.Decimal,
+    focusRequester: FocusRequester = remember { FocusRequester() }
+) {
+    // Estado local para evitar que el ViewModel recomponga toda la pantalla al escribir
+    var textoLocal by remember(clave) { mutableStateOf(valorInicial) }
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
+
+    LaunchedEffect(valorInicial) {
+        if (textoLocal != valorInicial && valorInicial.isEmpty()) {
+            textoLocal = valorInicial
+        }
+    }
+
+    TextField(
+        value = textoLocal,
+        onValueChange = { nuevo ->
+            textoLocal = nuevo
+            onTextoCambiado(nuevo)
+        },
+        modifier = modifier
+            .width(ancho)
+            .focusRequester(focusRequester)
+            .bringIntoViewRequester(bringIntoViewRequester)
+            .onFocusChanged { focusState ->
+                if (focusState.isFocused) {
+                    scope.launch {
+                        bringIntoViewRequester.bringIntoView()
+                    }
+                }
+            },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = tipoTeclado),
+        colors = colores,
         shape = EcoPosShapes.Campo
     )
 }
