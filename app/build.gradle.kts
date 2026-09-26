@@ -14,9 +14,7 @@ android {
         applicationId = "com.tuempresa.possystem"
         minSdk = 26 // Android 8.0 - necesario para Bluetooth SPP estable y CameraX
         targetSdk = 36
-        // El workflow de CI pasa VERSION_CODE (número de build de GitHub Actions),
-        // que siempre sube, así Android reconoce cada nueva APK como actualización.
-        versionCode = (project.findProperty("VERSION_CODE") as String?)?.toIntOrNull() ?: 1
+        versionCode = 1
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -29,9 +27,9 @@ android {
 
     signingConfigs {
         create("release") {
-            // Se completa en el paso de firmado (ver README > "Firma y build").
-            // El workflow de GitHub Actions pasa estos valores vía -P a partir
-            // de los secretos KEYSTORE_BASE64 / KEYSTORE_PASSWORD / KEY_ALIAS / KEY_PASSWORD.
+            // Se completa vía -P (gradle.properties o parámetros -P en CI, ver
+            // .github/workflows/android-build.yml). Si no están presentes,
+            // simplemente no se aplica y el build de release queda sin firmar.
             val keystorePath = project.findProperty("RELEASE_STORE_FILE") as String?
             if (keystorePath != null) {
                 storeFile = file(keystorePath)
@@ -48,17 +46,28 @@ android {
             applicationIdSuffix = ".debug"
         }
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // PRUEBA DE DIAGNÓSTICO TEMPORAL: isDebuggable = true para
+            // descartar si el toque perdido en TextField es causado por
+            // protecciones de MIUI/Android que tratan distinto a las apps
+            // no-debuggables (release normal es debuggable=false). Si con
+            // esto el bug desaparece, confirma la causa y luego se revierte
+            // este flag a false (una app de producción real NUNCA debe
+            // quedar debuggable=true) buscando la protección específica de
+            // MIUI que lo cause, en vez de dejar esto puesto.
+            isDebuggable = true
+            // Minify/R8 desactivado temporalmente: causaba fallos intermitentes
+            // de foco/click en los TextField de precio y stock por talla
+            // (ver reglas agregadas en proguard-rules.pro por si se reactiva
+            // más adelante). Costo: el APK pesa más, nada más.
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Firma con el keystore fijo cuando esté disponible (CI), para que
-            // cada APK instalada se reconozca como actualización de la anterior.
-            if (project.findProperty("RELEASE_STORE_FILE") != null) {
-                signingConfig = signingConfigs.getByName("release")
-            }
+            // Firma release activada: usa el keystore inyectado por CI
+            // (o por tu local.properties si compilas localmente).
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
