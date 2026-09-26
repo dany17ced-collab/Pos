@@ -3,8 +3,6 @@ name: Android CI
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:
@@ -20,7 +18,7 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
-        cache: gradle
+        cache: 'gradle'
 
     - name: Grant execute permission for gradlew
       run: |
@@ -35,35 +33,51 @@ jobs:
         echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > release.keystore
         echo "--- Verificación del keystore decodificado ---"
         ls -la release.keystore
-        echo "Ruta absoluta: $(pwd)/release.keystore"
+        echo "Ruta absoluta: ${{ github.workspace }}/release.keystore"
         file release.keystore || true
-        echo "--- ¿El archivo es un keystore JKS/PKCS12 válido? (esto SÍ debe pedir la contraseña y fallar si es incorrecta, pero si el error es de FORMATO en vez de contraseña, el .keystore está corrupto) ---"
-        keytool -list -keystore release.keystore -storepass "${{ secrets.KEYSTORE_PASSWORD }}" || echo "FALLÓ keytool -list -- ver el error de arriba: si dice 'Invalid keystore format' o similar, el archivo Base64 está corrupto"
-        echo "--- Verificación de que los secrets no llegan vacíos (sin mostrar su valor) ---"
-        if [ -z "${{ secrets.KEYSTORE_PASSWORD }}" ]; then echo "KEYSTORE_PASSWORD ESTÁ VACÍO"; else echo "KEYSTORE_PASSWORD tiene contenido"; fi
-        if [ -z "${{ secrets.KEY_ALIAS }}" ]; then echo "KEY_ALIAS ESTÁ VACÍO"; else echo "KEY_ALIAS tiene contenido"; fi
-        if [ -z "${{ secrets.KEY_PASSWORD }}" ]; then echo "KEY_PASSWORD ESTÁ VACÍO"; else echo "KEY_PASSWORD tiene contenido"; fi
+
+        # Verificar que los secretos no lleguen vacíos
+        if [ -z "${{ secrets.KEYSTORE_PASSWORD }}" ]; then echo "ERROR: KEYSTORE_PASSWORD está vacío"; exit 1; fi
+        if [ -z "${{ secrets.KEY_ALIAS }}" ]; then echo "ERROR: KEY_ALIAS está vacío"; exit 1; fi
+        if [ -z "${{ secrets.KEY_PASSWORD }}" ]; then echo "ERROR: KEY_PASSWORD está vacío"; exit 1; fi
+
+        # Intentar listar el keystore para verificar que la contraseña es correcta
+        keytool -list -keystore release.keystore -storepass "${{ secrets.KEYSTORE_PASSWORD }}" || echo "ADVERTENCIA: Falló keytool -list, verifica la contraseña del keystore"
 
     - name: Build signed release APK
       run: |
         ./gradlew clean assembleRelease \
-          -PRELEASE_STORE_FILE="$(pwd)/release.keystore" \
+          -PRELEASE_STORE_FILE=${{ github.workspace }}/release.keystore \
           -PRELEASE_STORE_PASSWORD="${{ secrets.KEYSTORE_PASSWORD }}" \
           -PRELEASE_KEY_ALIAS="${{ secrets.KEY_ALIAS }}" \
           -PRELEASE_KEY_PASSWORD="${{ secrets.KEY_PASSWORD }}" \
-          --no-build-cache --no-configuration-cache --info | tee build_log.txt
-        echo "--- Buscando confirmación de firma en el log ---"
-        grep -i "signingConfig\|validateSigningRelease\|packageRelease" build_log.txt || true
+          --no-build-cache --no-configuration-cache --stacktrace
+      # Nota: He añadido --stacktrace para ver el error real si Gradle falla
 
     - name: Verificar firma del APK generado
       run: |
-        APK_PATH=$(find . -name "app-release.apk" | head -1)
+        APK_PATH=$(find ${{ github.workspace }} -name "app-release.apk" | head -1)
         echo "APK encontrado en: $APK_PATH"
-        $ANDROID_HOME/build-tools/*/apksigner verify --print-certs "$APK_PATH" || echo "apksigner no disponible o falló -- revisar con keytool manualmente"
-        keytool -printcert -jarfile "$APK_PATH" || echo "ADVERTENCIA: el APK generado por CI no está firmado correctamente"
+
+        if [ -z "$APK_PATH" ]; then
+          echo "ERROR: No se encontró el APK app-release.apk"
+          exit 1
+        fi
+
+        # Buscar la versión más reciente de apksigner dinámicamente
+        APKSIGNER_PATH=$(find $ANDROID_HOME/build-tools -name "apksigner" | sort -V | tail -n 1)
+        
+        if [ -n "$APKSIGNER_PATH" ]; then
+          echo "Usando apksigner en: $APKSIGNER_PATH"
+          $APKSIGNER_PATH verify --print-certs "$APK_PATH"
+        else
+          echo "apksigner no encontrado. Intentando con keytool..."
+          keytool -printcert -jarfile "$APK_PATH"
+        fi
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: EcoPos-Release-APK
         path: '**/build/outputs/apk/release/app-release.apk'
+        if-no-files-found: error
