@@ -48,3 +48,18 @@ jobs:
       with:
         name: EcoPos-Release-APK
         path: '**/build/outputs/apk/release/app-release.apk'
+
+    - name: Build DIAGNOSTICO APK (debug config + firma release, temporal)
+      run: |
+        ./gradlew assembleDiagnostico \
+          -PRELEASE_STORE_FILE=../release.keystore \
+          -PRELEASE_STORE_PASSWORD="${{ secrets.KEYSTORE_PASSWORD }}" \
+          -PRELEASE_KEY_ALIAS="${{ secrets.KEY_ALIAS }}" \
+          -PRELEASE_KEY_PASSWORD="${{ secrets.KEY_PASSWORD }}" \
+          --no-build-cache --no-configuration-cache
+
+    - name: Upload APK Diagnostico
+      uses: actions/upload-artifact@v4
+      with:
+        name: EcoPos-Diagnostico-APK
+        path: '**/build/outputs/apk/diagnostico/app-diagnostico.apk'
