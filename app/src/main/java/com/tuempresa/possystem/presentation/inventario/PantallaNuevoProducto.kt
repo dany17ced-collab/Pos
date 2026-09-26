@@ -1,6 +1,5 @@
-package com.tuempresa.possystem.presentation.inventario
-
 @file:OptIn(ExperimentalFoundationApi::class)
+package com.tuempresa.possystem.presentation.inventario
 
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult
