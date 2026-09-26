@@ -192,15 +192,25 @@ internal fun TarjetaStat(
     }
 }
 
-/** Emoji por defecto según el nombre de la categoría, para acercarse al mockup sin depender de un ícono asignado en BD. */
+/**
+ * Emoji por defecto según el nombre de la categoría, para acercarse al mockup
+ * sin depender de un ícono asignado en BD. Se prioriza siempre un ícono de
+ * prenda/tela (nunca una etiqueta de precio) para que las categorías de ropa
+ * de punto/algodón (polos, poleras, camisetas, buzos) se vean coherentes.
+ */
 private fun emojiParaCategoria(nombre: String): String = when {
-    nombre.contains("polo", true) -> "👕"
+    nombre.contains("polo", true) || nombre.contains("camiseta", true) -> "👕"
+    nombre.contains("polera", true) || nombre.contains("buzo", true) || nombre.contains("sudadera", true) -> "👕"
+    nombre.contains("cafarena", true) || nombre.contains("cafarina", true) -> "👚"
+    nombre.contains("vivid", true) -> "🎽"
+    nombre.contains("short", true) || nombre.contains("shore", true) || nombre.contains("bermuda", true) -> "🩳"
     nombre.contains("pantal", true) || nombre.contains("jean", true) -> "👖"
-    nombre.contains("casaca", true) || nombre.contains("chaqueta", true) -> "🧥"
+    nombre.contains("casaca", true) -> "🧶"
+    nombre.contains("chaqueta", true) || nombre.contains("abrigo", true) -> "🧥"
     nombre.contains("vestido", true) -> "👗"
     nombre.contains("calzado", true) || nombre.contains("zapat", true) -> "👟"
     nombre.contains("accesorio", true) -> "🧦"
-    else -> "🏷️"
+    else -> "👕"
 }
 
 private val degradadosCategoria = listOf(
@@ -217,7 +227,7 @@ internal fun TarjetaCategoriaShelf(categoria: CategoriaEntity, indice: Int, onCl
     val colorTexto = if (indice % degradadosCategoria.size in textoOscuroCategoria) Color(0xFF21201C) else EcoPosColors.TextoBlanco
     Column(
         modifier = Modifier
-            .width(92.dp)
+            .width(112.dp)
             .clip(EcoPosShapes.Tarjeta)
             .background(Brush.verticalGradient(paleta))
             .clickable(onClick = onClick)
@@ -229,6 +239,7 @@ internal fun TarjetaCategoriaShelf(categoria: CategoriaEntity, indice: Int, onCl
             color = colorTexto,
             fontSize = 12.sp,
             fontWeight = FontWeight.ExtraBold,
+            softWrap = true,
             modifier = Modifier.padding(top = 6.dp)
         )
     }
